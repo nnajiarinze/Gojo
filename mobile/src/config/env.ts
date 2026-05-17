@@ -7,7 +7,7 @@ const ENV = {
     AUTH_TOKEN: 'dev-test-token', // Stub auth for development
   },
   production: {
-    API_BASE_URL: 'https://gojo-backend.onrender.com/api/v1',
+    API_BASE_URL: 'https://gojo-backend-5igv.onrender.com/api/v1',
     AUTH_TOKEN: 'dev-test-token', // Stub auth until Clerk is implemented
   },
 } as const;
