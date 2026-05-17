@@ -41,14 +41,12 @@ const worker = new Worker<OcrJobPayload>(
         totalAmount: data.totalAmount,
         currency: data.currency,
         confidence: data.confidence,
+        rawOcrResponse: { stub: true, source: 'backend-ocr-worker' },
         lineItems: data.lineItems.map((li) => ({
-          receiptId,
-          invoiceId: null,
           description: li.description,
           quantity: li.quantity,
           unitPrice: li.unitPrice,
           total: li.total,
-          sortOrder: li.sortOrder,
         })),
       });
 

@@ -1,10 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Load .env file into process.env
 try {
-  const envPath = resolve(import.meta.dirname, '../../.env');
+  const envPath = resolve(__dirname, '../../.env');
   const envFile = readFileSync(envPath, 'utf-8');
   for (const line of envFile.split('\n')) {
     const trimmed = line.trim();

@@ -1,0 +1,30 @@
+# Render Blueprint — Gojo Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: gojo-backend
+    runtime: node
+    region: frankfurt  # EU — closest to Sweden
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        sync: false  # Set manually — Supabase connection string
+      - key: REDIS_URL
+        sync: false  # Set manually — Upstash or similar
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false

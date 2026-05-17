@@ -9,16 +9,17 @@ import { invoiceRoutes } from './routes/invoice.routes.js';
 const app = Fastify({
   logger: {
     level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true },
-    },
+    ...(process.env.NODE_ENV !== 'production' ? {
+      transport: {
+        target: 'pino-pretty',
+        options: { colorize: true },
+      },
+    } : {}),
   },
-  requestId: true,
 });
 
 // Global error handler
-app.setErrorHandler(globalErrorHandler);
+app.setErrorHandler(globalErrorHandler as any);
 
 // Health check
 app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));

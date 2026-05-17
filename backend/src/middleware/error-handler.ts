@@ -5,7 +5,7 @@ export function globalErrorHandler(
   error: FastifyError | ZodError | Error,
   request: FastifyRequest,
   reply: FastifyReply
-): void {
+): any {
   request.log.error(error);
 
   // Zod validation errors
