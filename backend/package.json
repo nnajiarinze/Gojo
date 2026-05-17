@@ -22,8 +22,8 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/pg": "^8.10.0",
+    "@types/node": "^20.19.41",
+    "@types/pg": "^8.20.0",
     "@types/uuid": "^9.0.0",
     "node-pg-migrate": "^7.0.0",
     "tsx": "^4.7.0",
