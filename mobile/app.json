@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Gojo",
+    "slug": "gojo",
+    "version": "1.0.0",
+    "scheme": "gojo",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Gojo needs camera access to scan receipts."
+        }
+      ],
+      "expo-router",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.gojo"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.gojo"
+    }
+  }
+}

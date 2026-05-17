@@ -1,0 +1,384 @@
+{
+  "info": {
+    "name": "Gojo — Receipt-to-Invoice API",
+    "description": "Full API collection for the Gojo backend.\n\nAuth: All endpoints require `Authorization: Bearer <token>`. The stub auth accepts any token value.\n\nSet the `base_url` variable if your server runs on a different host/port.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "auth_token",
+      "value": "dev-test-token"
+    },
+    {
+      "key": "receipt_id",
+      "value": ""
+    },
+    {
+      "key": "invoice_id",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3000/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["health"]
+            },
+            "description": "Server health check. No auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health check returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Receipts",
+      "item": [
+        {
+          "name": "POST /upload-receipt-image",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/upload-receipt-image",
+              "host": ["{{base_url}}"],
+              "path": ["upload-receipt-image"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"receipt_001.jpg\",\n  \"contentType\": \"image/jpeg\"\n}"
+            },
+            "description": "Request a pre-signed S3 upload URL for a receipt image.\n\n**Required fields:**\n- `fileName` (string) — original filename\n- `contentType` (enum) — `image/jpeg`, `image/png`, or `image/heic`"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Upload receipt returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has receiptId', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.receiptId).to.be.a('string');",
+                  "    pm.collectionVariables.set('receipt_id', json.receiptId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /process-ocr",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/process-ocr",
+              "host": ["{{base_url}}"],
+              "path": ["process-ocr"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiptId\": \"{{receipt_id}}\"\n}"
+            },
+            "description": "Start OCR processing on an uploaded receipt.\n\n**Required fields:**\n- `receiptId` (UUID) — from upload-receipt-image response\n\n**Returns:** 202 with jobId and status `processing`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('OCR returns 202 Accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "pm.test('Response has jobId', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.jobId).to.be.a('string');",
+                  "    pm.expect(json.status).to.eql('processing');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /receipts/:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/receipts/{{receipt_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "{{receipt_id}}"]
+            },
+            "description": "Fetch a receipt by ID. Returns full receipt with line items and OCR data.\n\n**Path param:**\n- `id` (UUID)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get receipt returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has receipt data', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.be.a('string');",
+                  "    pm.expect(json.status).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "POST /generate-invoice",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/generate-invoice",
+              "host": ["{{base_url}}"],
+              "path": ["generate-invoice"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiptId\": \"{{receipt_id}}\",\n  \"customerId\": \"00000000-0000-0000-0000-000000000001\",\n  \"dueDate\": \"2026-06-16\",\n  \"notes\": \"Payment due within 30 days\",\n  \"lineItems\": [\n    {\n      \"description\": \"Kirkland Water 40pk\",\n      \"quantity\": 2,\n      \"unitPrice\": 4.99,\n      \"total\": 9.98\n    },\n    {\n      \"description\": \"Organic Bananas\",\n      \"quantity\": 1,\n      \"unitPrice\": 1.99,\n      \"total\": 1.99\n    }\n  ],\n  \"taxRate\": 8.0\n}"
+            },
+            "description": "Create an invoice from a receipt and enqueue PDF generation.\n\n**Required fields:**\n- `receiptId` (UUID)\n- `customerId` (UUID)\n- `dueDate` (YYYY-MM-DD)\n- `lineItems` (array, min 1 item)\n- `taxRate` (number, 0-100)\n\n**Optional:**\n- `notes` (string)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Generate invoice returns 202', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "pm.test('Response has invoiceId', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.invoiceId).to.be.a('string');",
+                  "    pm.expect(json.invoiceNumber).to.match(/^INV-/);",
+                  "    pm.collectionVariables.set('invoice_id', json.invoiceId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /invoices/:id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/invoices/{{invoice_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["invoices", "{{invoice_id}}"]
+            },
+            "description": "Fetch an invoice by ID. Returns full invoice with line items, PDF URL, and status.\n\n**Path param:**\n- `id` (UUID)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get invoice returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has invoice data', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.id).to.be.a('string');",
+                  "    pm.expect(json.invoiceNumber).to.match(/^INV-/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /send-email",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/send-email",
+              "host": ["{{base_url}}"],
+              "path": ["send-email"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceId\": \"{{invoice_id}}\",\n  \"to\": \"client@example.com\",\n  \"subject\": \"Invoice from Gojo\",\n  \"body\": \"Please find attached your invoice. Payment is due by June 16, 2026.\"\n}"
+            },
+            "description": "Send an invoice PDF via email.\n\n**Required fields:**\n- `invoiceId` (UUID) — must have status `ready`\n- `to` (email)\n- `subject` (string, max 200)\n- `body` (string, max 5000)\n\n**Precondition:** Invoice PDF must be generated first (status = `ready`)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Send email returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has emailId', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.emailId).to.be.a('string');",
+                  "    pm.expect(json.status).to.eql('sent');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth — Error Cases",
+      "item": [
+        {
+          "name": "Missing Auth Header → 401",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/receipts/00000000-0000-0000-0000-000000000001",
+              "host": ["{{base_url}}"],
+              "path": ["receipts", "00000000-0000-0000-0000-000000000001"]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Test that requests without an Authorization header are rejected with 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns 401 without auth', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Error message present', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('authorization');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Content Type → 400",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/upload-receipt-image",
+              "host": ["{{base_url}}"],
+              "path": ["upload-receipt-image"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"receipt.bmp\",\n  \"contentType\": \"image/bmp\"\n}"
+            },
+            "description": "Test that invalid contentType values are rejected by Zod validation."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns 400 for invalid content type', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
