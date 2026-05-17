@@ -253,11 +253,16 @@ export default function ResultScreen() {
         return;
       }
 
+      // Compute actual tax rate from receipt values
+      const computedTaxRate = (parsedReceipt?.vat && parsedReceipt?.subtotal && parsedReceipt.subtotal > 0)
+        ? Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100
+        : 25; // fallback to Swedish standard 25%
+
       const res = await generateInvoice({
         receiptId: receipt.id,
         customerId: mockCustomerId,
         dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        taxRate: 25,
+        taxRate: computedTaxRate,
         taxAmount: parsedReceipt?.vat ?? undefined,
         subtotal: parsedReceipt?.subtotal ?? undefined,
         totalAmount: parsedReceipt?.totalAmount ?? undefined,
