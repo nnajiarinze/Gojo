@@ -1,6 +1,11 @@
 -- Migration: 003_invoice-persistence
 -- Seed a stub customer for dev/testing, fix currency defaults to SEK
 
+-- Ensure stub user exists first
+INSERT INTO users (id, email, name, clerk_id)
+VALUES ('00000000-0000-0000-0000-000000000001', 'stub@gojo.dev', 'Stub User', 'clerk-stub')
+ON CONFLICT (id) DO NOTHING;
+
 -- Ensure stub customer exists for invoice generation
 INSERT INTO customers (id, user_id, name, email, company, address)
 VALUES (
