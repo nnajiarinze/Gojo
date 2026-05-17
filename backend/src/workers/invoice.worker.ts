@@ -1,9 +1,8 @@
 import { Worker, Job } from 'bullmq';
-import puppeteer from 'puppeteer';
 import { redis } from '../config/redis.js';
 import { JobNames, InvoiceJobPayload } from '../types/jobs.js';
 import * as invoiceRepo from '../repositories/invoice.repository.js';
-import { buildInvoiceHtml } from '../templates/invoice.html.js';
+import { generateInvoicePdf } from '../services/pdf.service.js';
 import { uploadPdf } from '../config/storage.js';
 import { env } from '../config/env.js';
 
@@ -18,31 +17,13 @@ const worker = new Worker<InvoiceJobPayload>(
     // 1. Fetch full invoice with line items
     const invoice = await invoiceRepo.getInvoiceById(invoiceId, userId);
     if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
+    console.log(`[Invoice Worker] Invoice loaded: ${invoice.invoiceNumber}, ${invoice.lineItems.length} items`);
 
-    // 2. Render HTML
-    const html = buildInvoiceHtml(invoice);
-    console.log(`[Invoice Worker] HTML rendered (${html.length} chars)`);
+    // 2. Generate PDF (pure Node — no browser needed)
+    const pdfBuffer = generateInvoicePdf(invoice);
+    console.log(`[Invoice Worker] PDF generated: ${pdfBuffer.length} bytes`);
 
-    // 3. Generate PDF with Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    });
-    let pdfBuffer: Buffer;
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'domcontentloaded' });
-      pdfBuffer = Buffer.from(await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-      }));
-      console.log(`[Invoice Worker] PDF generated: ${pdfBuffer.length} bytes`);
-    } finally {
-      await browser.close();
-    }
-
-    // 4. Upload to storage
+    // 3. Upload to storage
     let pdfUrl: string;
     if (env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
       pdfUrl = await uploadPdf(invoiceId, pdfBuffer);
@@ -59,7 +40,7 @@ const worker = new Worker<InvoiceJobPayload>(
       console.log(`[Invoice Worker] Saved locally: ${filePath}`);
     }
 
-    // 5. Mark invoice as ready with real pdfUrl
+    // 4. Mark invoice as ready with real pdfUrl
     await invoiceRepo.updateInvoiceStatus(invoiceId, 'ready', { pdfUrl });
     await invoiceRepo.logInvoiceEvent(invoiceId, 'pdf_completed', {
       pdfUrl,
