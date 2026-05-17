@@ -34,6 +34,8 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().default(''),
   OPENAI_API_KEY: z.string().default(''),
   RESEND_API_KEY: z.string().default(''),
+  SUPABASE_URL: z.string().default(''),
+  SUPABASE_SERVICE_KEY: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -100,6 +100,37 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(200).send({ ...rest, legal: legalMetadata ?? null });
   });
 
+  // Serve stored PDF — redirects to Supabase or streams local file
+  app.get('/invoices/:id/pdf', async (request, reply) => {
+    const params = idParamSchema.parse(request.params);
+    const userId = request.userId!;
+
+    const invoice = await invoiceService.getInvoiceById(params.id, userId);
+    if (!invoice) {
+      return reply.code(404).send({ error: 'Invoice not found' });
+    }
+    if (!invoice.pdfUrl || invoice.status === 'generating_pdf') {
+      return reply.code(202).send({ error: 'PDF is still generating. Please try again shortly.' });
+    }
+
+    // If pdfUrl is an external URL (Supabase), redirect
+    if (invoice.pdfUrl.startsWith('http')) {
+      return reply.redirect(invoice.pdfUrl);
+    }
+
+    // Local file fallback (dev)
+    const { resolve } = await import('node:path');
+    const { createReadStream, existsSync } = await import('node:fs');
+    const filePath = resolve('storage', 'invoices', `${params.id}.pdf`);
+    if (!existsSync(filePath)) {
+      return reply.code(404).send({ error: 'PDF file not found on disk' });
+    }
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}.pdf"`)
+      .send(createReadStream(filePath));
+  });
+
   app.post('/send-email', async (request, reply) => {
     const body = sendEmailSchema.parse(request.body);
     const userId = request.userId!;

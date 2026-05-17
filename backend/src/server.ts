@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import { env } from './config/env.js';
 import { connectRedis } from './config/redis.js';
 import { query } from './config/database.js';
+import { ensureBucket } from './config/storage.js';
 import { globalErrorHandler } from './middleware/error-handler.js';
 import { receiptRoutes } from './routes/receipt.routes.js';
 import { invoiceRoutes } from './routes/invoice.routes.js';
@@ -42,6 +43,13 @@ async function start(): Promise<void> {
   try {
     await connectRedis();
     await seedStubUser();
+
+    // Initialize PDF storage bucket
+    if (env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
+      await ensureBucket();
+    } else {
+      console.log('[Storage] Supabase not configured — using local filesystem for PDFs');
+    }
 
     // Boot workers (runs in-process for dev)
     await import('./workers/index.js');

@@ -14,7 +14,7 @@ import { getInvoice, sendInvoiceEmail } from '../src/api/receipts';
 import { StatusBadge } from '../src/components/StatusBadge';
 import { ErrorState } from '../src/components/ErrorState';
 import type { Invoice } from '../src/types/api';
-import { generateAndShareInvoicePdf } from '../src/services/invoicePdf';
+import { downloadAndShareInvoicePdf } from '../src/services/invoicePdfDownload';
 
 export default function InvoiceScreen() {
   const router = useRouter();
@@ -213,19 +213,21 @@ export default function InvoiceScreen() {
         onPress={async () => {
           setGeneratingPdf(true);
           try {
-            const uri = await generateAndShareInvoicePdf(invoice);
-            console.log(`[Invoice] PDF shared: ${uri}`);
+            const uri = await downloadAndShareInvoicePdf(invoice);
+            console.log(`[Invoice] PDF downloaded: ${uri}`);
           } catch (err: any) {
             console.error('[Invoice] PDF error:', err);
-            Alert.alert('PDF-fel', err?.message ?? 'Kunde inte skapa PDF');
+            Alert.alert('PDF-fel', err?.message ?? 'Kunde inte ladda ner PDF');
           } finally {
             setGeneratingPdf(false);
           }
         }}
-        disabled={generatingPdf}
+        disabled={generatingPdf || invoice.status === 'generating_pdf'}
       >
         {generatingPdf ? (
           <ActivityIndicator color="#fff" />
+        ) : invoice.status === 'generating_pdf' ? (
+          <Text style={styles.pdfBtnText}>⏳ PDF genereras...</Text>
         ) : (
           <Text style={styles.pdfBtnText}>📄 Ladda ner PDF</Text>
         )}
