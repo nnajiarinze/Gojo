@@ -44,6 +44,15 @@ export default function ResultScreen() {
   // Editable fields — initialize from parsedReceipt if available
   const initialMerchant = (parsedReceipt?.merchantName || receipt?.merchantName) ?? '';
   const [merchantName, setMerchantName] = useState(initialMerchant);
+  const [editMomsSats, setEditMomsSats] = useState<string>(() => {
+    if (parsedReceipt?.vat && parsedReceipt?.subtotal && parsedReceipt.subtotal > 0) {
+      return String(Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100);
+    }
+    return '25';
+  });
+  const [editMomsBelopp, setEditMomsBelopp] = useState<string>(() => {
+    return String(parsedReceipt?.vat ?? 0);
+  });
   const [editItems, setEditItems] = useState<EditableLineItem[]>(() => {
     if (parsedReceipt && parsedReceipt.lineItems.length > 0) {
       return parsedReceipt.lineItems.map((li: any) => ({
@@ -63,6 +72,10 @@ export default function ResultScreen() {
       const ts = Date.now();
       console.log(`[Result] AUTO-HYDRATE @ ${ts}: ${parsedReceipt.lineItems.length} items, VAT: ${parsedReceipt.vat} (${parsedReceipt.debug.vatSource}), Kontrollenhet: ${parsedReceipt.kontrollenhet || '(missing)'}`);
       setMerchantName(parsedReceipt.merchantName || receipt?.merchantName || '');
+      if (parsedReceipt.vat != null) setEditMomsBelopp(String(parsedReceipt.vat));
+      if (parsedReceipt.subtotal && parsedReceipt.subtotal > 0 && parsedReceipt.vat != null) {
+        setEditMomsSats(String(Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100));
+      }
       setEditItems(
         parsedReceipt.lineItems.map((li: any) => ({
           description: li.description,
@@ -253,17 +266,26 @@ export default function ResultScreen() {
         return;
       }
 
-      // Compute actual tax rate from receipt values
-      const computedTaxRate = (parsedReceipt?.vat && parsedReceipt?.subtotal && parsedReceipt.subtotal > 0)
-        ? Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100
-        : 25; // fallback to Swedish standard 25%
+      // Use editable MOMS values (user may have corrected them)
+      const taxRate = parseFloat(editMomsSats) || 25;
+      const taxAmount = parseFloat(editMomsBelopp) || 0;
+
+      // Validate MOMS
+      if (taxRate < 0 || taxRate > 100) {
+        Alert.alert('Ogiltig MOMS-sats', 'MOMS-sats måste vara mellan 0 och 100%.');
+        return;
+      }
+      if (taxAmount < 0) {
+        Alert.alert('Ogiltigt MOMS-belopp', 'MOMS-belopp kan inte vara negativt.');
+        return;
+      }
 
       const res = await generateInvoice({
         receiptId: receipt.id,
         customerId: mockCustomerId,
         dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        taxRate: computedTaxRate,
-        taxAmount: parsedReceipt?.vat ?? undefined,
+        taxRate,
+        taxAmount: taxAmount || undefined,
         subtotal: parsedReceipt?.subtotal ?? undefined,
         totalAmount: parsedReceipt?.totalAmount ?? undefined,
         lineItems: finalLineItems,
@@ -352,6 +374,32 @@ export default function ResultScreen() {
           <TouchableOpacity style={styles.addItemBtn} onPress={addLineItem}>
             <Text style={styles.addItemText}>+ Add Item</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.editCard}>
+          <Text style={styles.editSectionTitle}>MOMS</Text>
+          <View style={styles.editRow}>
+            <View style={styles.editCol}>
+              <Text style={styles.editMiniLabel}>MOMS-sats (%)</Text>
+              <TextInput
+                style={styles.inputSmall}
+                value={editMomsSats}
+                onChangeText={setEditMomsSats}
+                keyboardType="numeric"
+                placeholder="25"
+              />
+            </View>
+            <View style={styles.editCol}>
+              <Text style={styles.editMiniLabel}>MOMS-belopp (SEK)</Text>
+              <TextInput
+                style={styles.inputSmall}
+                value={editMomsBelopp}
+                onChangeText={setEditMomsBelopp}
+                keyboardType="numeric"
+                placeholder="0"
+              />
+            </View>
+          </View>
         </View>
 
         <View style={styles.editCard}>
