@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
@@ -26,6 +29,9 @@ export default function InvoiceScreen() {
   const [sending, setSending] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (invoiceCreated?.invoiceId && !invoice) {
@@ -85,6 +91,10 @@ export default function InvoiceScreen() {
   }
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
@@ -165,46 +175,88 @@ export default function InvoiceScreen() {
         </View>
       )}
 
-      {/* Send Email — available when invoice PDF is ready */}
+      {/* ─── Send Email Section ─── */}
       {(invoice.status === 'ready' || invoice.status === 'sent') && (
-        <TouchableOpacity
-          style={styles.sendBtn}
-          onPress={async () => {
-            setSending(true);
-            try {
-              await sendInvoiceEmail({
-                invoiceId: invoice.id,
-                to: 'customer@gojo.dev',
-                subject: `Invoice ${invoice.invoiceNumber}`,
-                body: `Please find attached invoice ${invoice.invoiceNumber} for ${invoice.currency} ${invoice.totalAmount.toFixed(2)}.`,
-              });
-              // Refresh invoice to show updated status
-              const updated = await getInvoice(invoice.id);
-              setInvoice(updated);
-              Alert.alert('Sent!', `Invoice emailed successfully.`);
-            } catch (err: any) {
-              const msg = err?.response?.data?.error ?? err?.message ?? 'Failed to send';
-              Alert.alert('Send Error', msg);
-            } finally {
-              setSending(false);
-            }
-          }}
-          disabled={sending}
-        >
-          {sending ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.sendBtnText}>
-              {invoice.status === 'sent' ? '📧 Resend Email' : '📧 Send Email'}
+        <View style={styles.emailSection}>
+          <Text style={styles.sectionTitle}>SKICKA FAKTURA VIA E-POST</Text>
+
+          <Text style={styles.inputLabel}>Mottagarens namn</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="T.ex. Anna Andersson"
+            placeholderTextColor="#9CA3AF"
+            value={recipientName}
+            onChangeText={(t) => { setRecipientName(t); setEmailError(null); }}
+            autoCapitalize="words"
+            returnKeyType="next"
+          />
+
+          <Text style={[styles.inputLabel, { marginTop: 12 }]}>E-postadress</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="namn@företag.se"
+            placeholderTextColor="#9CA3AF"
+            value={recipientEmail}
+            onChangeText={(t) => { setRecipientEmail(t); setEmailError(null); }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="send"
+          />
+
+          {emailError && (
+            <Text style={styles.emailErrorText}>{emailError}</Text>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.sendBtn,
+              (!recipientName.trim() || !recipientEmail.trim() || sending) && styles.sendBtnDisabled,
+            ]}
+            onPress={async () => {
+              // Validate
+              const trimmedName = recipientName.trim();
+              const trimmedEmail = recipientEmail.trim();
+              if (!trimmedName) { setEmailError('Ange mottagarens namn.'); return; }
+              if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+                setEmailError('Ange en giltig e-postadress.'); return;
+              }
+              setEmailError(null);
+              setSending(true);
+              try {
+                await sendInvoiceEmail({
+                  invoiceId: invoice.id,
+                  to: trimmedEmail,
+                  subject: `Faktura ${invoice.invoiceNumber} från ${invoice.legal?.companyName || 'Gojo'}`,
+                  body: `Hej ${trimmedName},\n\nBifogat finner du faktura ${invoice.invoiceNumber} på ${invoice.currency} ${invoice.totalAmount.toFixed(2)}.\n\nMed vänlig hälsning,\n${invoice.legal?.companyName || 'Gojo'}`,
+                });
+                const updated = await getInvoice(invoice.id);
+                setInvoice(updated);
+                Alert.alert('Skickat!', `Faktura skickad till ${trimmedEmail}.`);
+              } catch (err: any) {
+                const msg = err?.response?.data?.error ?? err?.message ?? 'Kunde inte skicka';
+                setEmailError(msg);
+              } finally {
+                setSending(false);
+              }
+            }}
+            disabled={sending || !recipientName.trim() || !recipientEmail.trim()}
+          >
+            {sending ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.sendBtnText}>
+                {invoice.status === 'sent' ? '📧 Skicka igen' : '📧 Skicka faktura'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {invoice.status === 'sent' && invoice.sentAt && (
+            <Text style={styles.sentInfo}>
+              Skickad {new Date(invoice.sentAt).toLocaleDateString('sv-SE')}
             </Text>
           )}
-        </TouchableOpacity>
-      )}
-
-      {invoice.status === 'sent' && invoice.sentAt && (
-        <Text style={styles.sentInfo}>
-          Sent on {new Date(invoice.sentAt).toLocaleDateString()}
-        </Text>
+        </View>
       )}
 
       {/* Download PDF */}
@@ -249,6 +301,7 @@ export default function InvoiceScreen() {
         Invoice ID: {invoice.id?.slice(0, 8)}… | Status: {invoice.status}
       </Text>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -372,11 +425,13 @@ const styles = StyleSheet.create({
   pdfBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   sendBtn: {
     backgroundColor: '#7C3AED',
-    marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 16,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.5,
   },
   sendBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   sentInfo: {
@@ -385,6 +440,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 12,
+  },
+  emailSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#111827',
+  },
+  emailErrorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    marginTop: 8,
   },
   debug: {
     marginTop: 16,
