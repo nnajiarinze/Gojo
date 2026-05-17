@@ -135,26 +135,40 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
     const body = sendEmailSchema.parse(request.body);
     const userId = request.userId!;
 
+    console.log(`[Route] POST /send-email invoiceId=${body.invoiceId} to=${body.to}`);
+
     const invoice = await invoiceService.getInvoiceById(body.invoiceId, userId);
     if (!invoice) {
       return reply.code(404).send({ error: 'Invoice not found' });
     }
 
+    console.log(`[Route] Invoice status=${invoice.status} pdfUrl=${invoice.pdfUrl}`);
+
     if (invoice.status !== 'ready' && invoice.status !== 'sent') {
       return reply.code(400).send({ error: 'Invoice PDF not ready yet. Please wait a moment.' });
     }
 
-    const result = await emailService.enqueueEmailJob({
-      invoiceId: body.invoiceId,
-      to: body.to,
-      subject: body.subject,
-      body: body.body,
-    });
+    if (!invoice.pdfUrl) {
+      return reply.code(400).send({ error: 'Invoice has no PDF stored. Please wait for PDF generation.' });
+    }
 
-    return reply.code(200).send({
-      emailId: result.emailId,
-      status: 'sent',
-      sentAt: new Date().toISOString(),
-    });
+    try {
+      const result = await emailService.sendInvoiceEmail({
+        invoiceId: body.invoiceId,
+        userId,
+        to: body.to,
+        subject: body.subject,
+        body: body.body,
+      });
+
+      return reply.code(200).send({
+        emailId: result.emailId,
+        status: 'sent',
+        sentAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error(`[Route] Email send failed:`, err.message);
+      return reply.code(500).send({ error: err.message });
+    }
   });
 }
