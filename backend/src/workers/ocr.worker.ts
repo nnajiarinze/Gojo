@@ -22,10 +22,24 @@ const worker = new Worker<OcrJobPayload>(
 
     try {
       // TODO: Replace with real OCR extraction (GPT-4o Vision, Google Document AI, etc.)
-      // For now, mark as failed — the mobile app handles this gracefully
-      // by showing the parser failure UI with manual entry option.
-      console.log(`[OCR Worker] No OCR engine configured — marking receipt as failed`);
-      await repo.setFailed(receiptId, 'OCR engine not configured. Use local device OCR or enter data manually.');
+      // No server-side OCR engine configured. Transition to "extracted" with empty data
+      // so the mobile app's local device OCR (which already ran) can be used as the
+      // primary data source. The mobile parser is the real extraction engine.
+      console.log(`[OCR Worker] No OCR engine configured — marking as extracted (device OCR is primary)`);
+      await repo.setExtractedData(receiptId, {
+        merchantName: '',
+        merchantAddress: '',
+        receiptDate: new Date().toISOString().split('T')[0],
+        subtotal: 0,
+        taxAmount: 0,
+        totalAmount: 0,
+        currency: 'SEK',
+        confidence: 0,
+        rawOcrResponse: { source: 'backend-placeholder', note: 'No server OCR — device OCR is primary' },
+        lineItems: [],
+      });
+
+      console.log(`[OCR Worker] Receipt ${receiptId} marked extracted (awaiting device OCR data)`);
     } catch (err: any) {
       console.error(`[OCR Worker] Receipt ${receiptId} failed:`, err.message);
       await repo.setFailed(receiptId, err.message);
