@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS receipt_audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_receipt_audit_log_receipt_id ON receipt_audit_log(receipt_id);
-CREATE INDEX idx_receipt_audit_log_created_at ON receipt_audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_receipt_audit_log_receipt_id ON receipt_audit_log(receipt_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_audit_log_created_at ON receipt_audit_log(created_at);

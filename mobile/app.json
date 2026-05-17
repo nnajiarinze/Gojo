@@ -30,6 +30,12 @@
     },
     "ios": {
       "bundleIdentifier": "com.anonymous.gojo"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "888e478c-901f-4f6d-a4e9-b70c6c75c4ca"
+      }
     }
   }
 }

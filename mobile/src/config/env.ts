@@ -3,7 +3,7 @@
 
 const ENV = {
   development: {
-    API_BASE_URL: 'http://192.168.1.213:3000/api/v1',
+    API_BASE_URL: 'https://gojo-backend-5igv.onrender.com/api/v1',
     AUTH_TOKEN: 'dev-test-token', // Stub auth for development
   },
   production: {

@@ -3,7 +3,7 @@ import { config } from '../config/env';
 
 export const apiClient = axios.create({
   baseURL: config.API_BASE_URL,
-  timeout: 30000,
+  timeout: 120000, // 2 min to handle Render free tier cold starts
   headers: {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${config.AUTH_TOKEN}`,

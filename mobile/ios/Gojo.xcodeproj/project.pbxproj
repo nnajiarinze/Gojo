@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		06F466D2E26F218409A67023 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FFEBF54013C06B0844E65328 /* PrivacyInfo.xcprivacy */; };
+		0CABCFB6B50FAC999DF2C286 /* main.jsbundle in Resources */ = {isa = PBXBuildFile; fileRef = 6D1AE58227430765985AE88A /* main.jsbundle */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		2BEE992AC05177EF395DCE0C /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027C727B267D8627790465C7 /* ExpoModulesProvider.swift */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
@@ -25,6 +26,7 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Gojo/Info.plist; sourceTree = "<group>"; };
 		178252F7875D2E1DA4CC0E6F /* AppleVisionOCR.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = AppleVisionOCR.m; path = Gojo/AppleVisionOCR.m; sourceTree = "<group>"; };
 		36E4A04C23FF8F57D679D573 /* Pods-Gojo.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gojo.debug.xcconfig"; path = "Target Support Files/Pods-Gojo/Pods-Gojo.debug.xcconfig"; sourceTree = "<group>"; };
+		6D1AE58227430765985AE88A /* main.jsbundle */ = {isa = PBXFileReference; includeInIndex = 1; path = main.jsbundle; sourceTree = "<group>"; };
 		6FE120E6F917CBBAAF1589BD /* Pods-Gojo.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Gojo.release.xcconfig"; path = "Target Support Files/Pods-Gojo/Pods-Gojo.release.xcconfig"; sourceTree = "<group>"; };
 		958A9FEE021F5CD478E896DB /* libPods-Gojo.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Gojo.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Gojo/SplashScreen.storyboard; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 				FFEBF54013C06B0844E65328 /* PrivacyInfo.xcprivacy */,
 				F8084F4155AF7F4081AF834B /* AppleVisionOCR.swift */,
 				178252F7875D2E1DA4CC0E6F /* AppleVisionOCR.m */,
+				6D1AE58227430765985AE88A /* main.jsbundle */,
 			);
 			name = Gojo;
 			sourceTree = "<group>";
@@ -243,6 +246,7 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				06F466D2E26F218409A67023 /* PrivacyInfo.xcprivacy in Resources */,
+				0CABCFB6B50FAC999DF2C286 /* main.jsbundle in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
