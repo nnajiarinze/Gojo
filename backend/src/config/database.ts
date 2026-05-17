@@ -1,11 +1,14 @@
 import { Pool } from 'pg';
 import { env } from './env.js';
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  ...(isProduction ? { ssl: { rejectUnauthorized: false } } : {}),
 });
 
 export async function query<T>(text: string, params?: unknown[]): Promise<T[]> {
