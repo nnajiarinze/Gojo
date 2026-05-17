@@ -6,6 +6,7 @@ import { ensureBucket } from './config/storage.js';
 import { globalErrorHandler } from './middleware/error-handler.js';
 import { receiptRoutes } from './routes/receipt.routes.js';
 import { invoiceRoutes } from './routes/invoice.routes.js';
+import { adminRoutes } from './routes/admin.routes.js';
 
 const app = Fastify({
   logger: {
@@ -28,6 +29,7 @@ app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOStrin
 // API routes
 app.register(receiptRoutes, { prefix: '/api/v1' });
 app.register(invoiceRoutes, { prefix: '/api/v1' });
+app.register(adminRoutes, { prefix: '/admin' });
 
 async function seedStubUser(): Promise<void> {
   await query(

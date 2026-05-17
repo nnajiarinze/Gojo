@@ -34,6 +34,7 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().default(''),
   OPENAI_API_KEY: z.string().default(''),
   RESEND_API_KEY: z.string().default(''),
+  ADMIN_TOKEN: z.string().default('gojo-admin-secret'),
   SUPABASE_URL: z.string().default(''),
   SUPABASE_SERVICE_KEY: z.string().default(''),
 });
