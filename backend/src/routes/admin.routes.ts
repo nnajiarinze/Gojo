@@ -306,7 +306,7 @@ function renderList() {
     + '</tr></thead><tbody>';
 
   for (const inv of invoices) {
-    html += '<tr onclick="loadDetail(\\'' + inv.id + '\\')">'
+    html += '<tr onclick="loadDetail(&apos;' + inv.id + '&apos;)">'
       + '<td>' + inv.invoiceNumber + '</td>'
       + '<td>' + formatDate(inv.issueDate) + '</td>'
       + '<td class="amount">' + formatAmount(inv.totalAmount) + ' ' + (inv.currency||'SEK') + '</td>'
@@ -402,7 +402,7 @@ function renderDetail(inv) {
   html += '<div class="card"><h2>Resend Email</h2>'
     + '<div style="display:flex;gap:8px;align-items:center">'
     + '<input type="email" id="resend-to" placeholder="recipient@example.com" />'
-    + '<button class="btn btn-primary" id="resend-btn" onclick="resendEmail(\\'' + inv.id + '\\')">Resend</button>'
+    + '<button class="btn btn-primary" id="resend-btn" onclick="resendEmail(&apos;' + inv.id + '&apos;)">Resend</button>'
     + '</div><div id="resend-status" style="margin-top:8px;font-size:13px"></div></div>';
 
   // Raw JSON
