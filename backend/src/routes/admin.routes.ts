@@ -41,6 +41,12 @@ function parseInvoiceRow(row: any) {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  // Serve admin SPA (no token required — token is sent via JS fetch calls)
+  app.get('/ui', async (_request, reply) => {
+    return reply.type('text/html').send(ADMIN_HTML);
+  });
+
+  // All other admin routes require token
   app.addHook('preHandler', requireAdminToken);
 
   // ── List invoices (paginated) ───────────────────────────────────────────
@@ -156,11 +162,6 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     } catch (err: any) {
       return reply.code(500).send({ error: err.message });
     }
-  });
-
-  // ── Serve admin SPA ─────────────────────────────────────────────────────
-  app.get('/ui', async (_request, reply) => {
-    return reply.type('text/html').send(ADMIN_HTML);
   });
 }
 
