@@ -12,6 +12,8 @@ async function requireAdminToken(request: FastifyRequest, reply: FastifyReply) {
   }
 }
 
+const guardedRoute = { preHandler: requireAdminToken };
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function parseInvoiceRow(row: any) {
@@ -46,11 +48,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.type('text/html').send(ADMIN_HTML);
   });
 
-  // All other admin routes require token
-  app.addHook('preHandler', requireAdminToken);
-
   // ── List invoices (paginated) ───────────────────────────────────────────
-  app.get('/invoices', async (request, reply) => {
+  app.get('/invoices', { ...guardedRoute }, async (request, reply) => {
     const { page = '1', limit = '20' } = request.query as any;
     const p = Math.max(1, parseInt(page, 10) || 1);
     const l = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
@@ -83,7 +82,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Get single invoice detail ───────────────────────────────────────────
-  app.get('/invoices/:id', async (request, reply) => {
+  app.get('/invoices/:id', { ...guardedRoute }, async (request, reply) => {
     const { id } = request.params as any;
 
     const row = await queryOne<any>('SELECT * FROM invoices WHERE id = $1', [id]);
@@ -121,7 +120,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // ── Resend email ────────────────────────────────────────────────────────
-  app.post('/invoices/:id/resend-email', async (request, reply) => {
+  app.post('/invoices/:id/resend-email', { ...guardedRoute }, async (request, reply) => {
     const { id } = request.params as any;
     const { to } = (request.body as any) ?? {};
 
