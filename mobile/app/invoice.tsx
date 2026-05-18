@@ -14,7 +14,6 @@ import {
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
 import { getInvoice, sendInvoiceEmail } from '../src/api/receipts';
-import { StatusBadge } from '../src/components/StatusBadge';
 import { ErrorState } from '../src/components/ErrorState';
 import type { Invoice } from '../src/types/api';
 import { downloadAndShareInvoicePdf } from '../src/services/invoicePdfDownload';
@@ -38,6 +37,22 @@ export default function InvoiceScreen() {
       fetchInvoice(invoiceCreated.invoiceId);
     }
   }, [invoiceCreated]);
+
+  // Auto-poll while invoice is generating PDF
+  useEffect(() => {
+    if (!invoice || invoice.status !== 'generating_pdf') return;
+    const interval = setInterval(async () => {
+      try {
+        const updated = await getInvoice(invoice.id);
+        if (updated.status !== 'generating_pdf') {
+          setInvoice(updated);
+          clearInterval(interval);
+          console.log(`[Invoice] PDF ready — status: ${updated.status}`);
+        }
+      } catch { /* ignore polling errors */ }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [invoice?.status]);
 
   async function fetchInvoice(invoiceId: string) {
     setLoading(true);
@@ -98,9 +113,19 @@ export default function InvoiceScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
+        <Text style={styles.successEmoji}>✅</Text>
         <Text style={styles.invoiceTitle}>FAKTURA</Text>
         <Text style={styles.invoiceNumber}>{invoice.invoiceNumber}</Text>
-        <StatusBadge status="invoiced" />
+        {invoice.status === 'generating_pdf' ? (
+          <View style={styles.statusPill}>
+            <ActivityIndicator size="small" color="#7C3AED" />
+            <Text style={styles.statusPillText}>PDF genereras...</Text>
+          </View>
+        ) : (
+          <View style={styles.statusPillReady}>
+            <Text style={styles.statusPillReadyText}>Redo</Text>
+          </View>
+        )}
       </View>
 
       {/* Restaurant / Legal info */}
@@ -176,7 +201,7 @@ export default function InvoiceScreen() {
       )}
 
       {/* ─── Send Email Section ─── */}
-      {(invoice.status === 'ready' || invoice.status === 'sent') && (
+      {(invoice.status === 'ready' || invoice.status === 'sent' || invoice.status === 'generating_pdf') && (
         <View style={styles.emailSection}>
           <Text style={styles.sectionTitle}>SKICKA FAKTURA VIA E-POST</Text>
 
@@ -482,4 +507,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'monospace',
   },
+  successEmoji: { fontSize: 32, marginBottom: 4 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F3E8FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 4 },
+  statusPillText: { fontSize: 13, color: '#7C3AED', fontWeight: '600' },
+  statusPillReady: { backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 4 },
+  statusPillReadyText: { fontSize: 13, color: '#065F46', fontWeight: '700' },
 });

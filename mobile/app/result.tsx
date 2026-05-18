@@ -171,20 +171,41 @@ export default function ResultScreen() {
     if (!receipt) return;
     setLoading(true);
     try {
-      // FIX: Fetch fresh receipt before attempting state transition.
-      // The Zustand receipt can be stale if the user navigated back and forth,
-      // or if a previous Save & Review already moved it to 'reviewed'.
-      // Without this check, we'd call POST /review on an already-reviewed
-      // receipt, causing "Invalid state transition" error.
       const fresh = await getReceipt(receipt.id);
       if (fresh.status !== 'extracted') {
         console.log(`[Result] Receipt already ${fresh.status}, skipping review call`);
         setReceipt(fresh);
         return;
       }
-      await reviewReceipt(receipt.id);
-      console.log(`[Result] Receipt ${receipt.id} reviewed`);
-      const updated = await getReceipt(receipt.id);
+
+      // The backend has no line items (OCR worker stores empty data).
+      // Push local parsed data to the backend so validation passes.
+      const lineItemsToSave = editItems.length > 0
+        ? editItems.map((item) => ({
+            description: item.description.trim(),
+            quantity: parseFloat(item.quantity) || 0,
+            unitPrice: parseFloat(item.unitPrice) || 0,
+            total: computeTotal(item),
+          }))
+        : (parsedReceipt?.lineItems ?? []).map((li: any) => ({
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+            total: li.total,
+          }));
+
+      if (lineItemsToSave.length === 0) {
+        Alert.alert('Inga rader', 'Kvittot har inga rader. Redigera och lägg till rader först.');
+        setLoading(false);
+        return;
+      }
+
+      // Use updateReceipt which saves line items AND transitions to 'reviewed'
+      const updated = await updateReceipt(receipt.id, {
+        merchantName: merchantName || parsedReceipt?.merchantName || receipt.merchantName || '',
+        lineItems: lineItemsToSave,
+      });
+      console.log(`[Result] Receipt confirmed & reviewed: ${updated.status}`);
       setReceipt(updated);
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message ?? err.message ?? 'Failed to review');
