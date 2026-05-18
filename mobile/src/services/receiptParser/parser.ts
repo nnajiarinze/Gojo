@@ -531,3 +531,95 @@ function parseInterleavedLayout(
 
   if (currentItem) warnings.push(`"${currentItem.description}" at end had no price`);
 }
+
+// ─── Parse Result Type ───────────────────────────────────────────────
+
+export type ParseResult =
+  | {
+      success: true;
+      data: ParsedReceipt;
+      confidence: number;
+    }
+  | {
+      success: false;
+      reason: string;
+      confidence: number;
+      partialData?: Partial<ParsedReceipt>;
+    };
+
+// ─── Confidence Thresholds ───────────────────────────────────────────
+
+export const CONFIDENCE_HIGH = 0.8;
+export const CONFIDENCE_MEDIUM = 0.5;
+
+/**
+ * Safe wrapper around parseReceiptText that returns a structured ParseResult.
+ * Never throws — always returns success or failure with reason.
+ */
+export function parseReceiptSafe(rawText: string): ParseResult {
+  try {
+    if (!rawText || rawText.trim().length < 10) {
+      console.log('[Parser] parseReceiptSafe: text too short or empty');
+      return {
+        success: false,
+        reason: 'Kvittotexten är för kort eller tom',
+        confidence: 0,
+      };
+    }
+
+    const parsed = parseReceiptText(rawText);
+
+    // Determine if parse was successful based on critical fields
+    const hasLineItems = parsed.lineItems.length > 0;
+    const hasTotal = parsed.totalAmount > 0;
+    const hasMerchant = parsed.merchantName.length > 0;
+
+    console.log(`[Parser] parseReceiptSafe: items=${parsed.lineItems.length}, total=${parsed.totalAmount}, merchant="${parsed.merchantName}", confidence=${parsed.confidence}`);
+
+    // Critical failure: no line items AND no total
+    if (!hasLineItems && !hasTotal) {
+      return {
+        success: false,
+        reason: 'Kunde inte hitta några rader eller totalbelopp på kvittot',
+        confidence: parsed.confidence,
+        partialData: {
+          merchantName: hasMerchant ? parsed.merchantName : undefined,
+          kontrollenhet: parsed.kontrollenhet || undefined,
+          merchantLegalInfo: parsed.merchantLegalInfo,
+        },
+      };
+    }
+
+    // Partial success: has total but no items (or vice versa)
+    if (!hasLineItems) {
+      return {
+        success: false,
+        reason: 'Inga rader kunde tolkas — fyll i manuellt',
+        confidence: Math.min(parsed.confidence, 0.4),
+        partialData: {
+          merchantName: parsed.merchantName,
+          totalAmount: parsed.totalAmount,
+          subtotal: parsed.subtotal,
+          vat: parsed.vat,
+          kontrollenhet: parsed.kontrollenhet,
+          merchantLegalInfo: parsed.merchantLegalInfo,
+          currency: parsed.currency,
+        },
+      };
+    }
+
+    // Success
+    return {
+      success: true,
+      data: parsed,
+      confidence: parsed.confidence,
+    };
+  } catch (err: any) {
+    console.error('[Parser] parseReceiptSafe: unexpected error:', err.message);
+    return {
+      success: false,
+      reason: `Parsningsfel: ${err.message}`,
+      confidence: 0,
+    };
+  }
+}

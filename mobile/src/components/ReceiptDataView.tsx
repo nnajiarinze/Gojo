@@ -62,7 +62,8 @@ export function ReceiptDataView({ receipt, parsedReceipt }: ReceiptDataViewProps
       )}
 
       <Field label="Netto" value={fmtC(currency, subtotal)} />
-      <Field label={`Moms (${vatSource})`} value={fmtC(currency, vat)} />
+      <Field label="MOMS-sats" value={subtotal && vat && subtotal > 0 ? `${Math.round((vat / subtotal) * 10000) / 100}%` : '—'} />
+      <Field label={`MOMS-belopp (${vatSource})`} value={fmtC(currency, vat)} />
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Totalt</Text>
         <Text style={styles.totalValue}>{fmtC(currency, totalAmount)}</Text>

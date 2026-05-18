@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Receipt, Invoice, InvoiceCreatedResponse } from '../types/api';
 import type { OCRResult } from '../services/ocrService';
-import type { ParsedReceipt } from '../services/receiptParser';
+import type { ParsedReceipt, ParseResult } from '../services/receiptParser';
 
 export type FlowStep = 'idle' | 'capturing' | 'uploading' | 'processing' | 'done' | 'error';
 
@@ -15,6 +15,7 @@ interface ReceiptState {
   invoice: Invoice | null;
   localOcr: OCRResult | null;
   parsedReceipt: ParsedReceipt | null;
+  parseResult: ParseResult | null;
 
   setImageUri: (uri: string) => void;
   setReceiptId: (id: string) => void;
@@ -23,6 +24,7 @@ interface ReceiptState {
   setInvoice: (invoice: Invoice) => void;
   setLocalOcr: (result: OCRResult) => void;
   setParsedReceipt: (parsed: ParsedReceipt) => void;
+  setParseResult: (result: ParseResult) => void;
   setStep: (step: FlowStep) => void;
   setError: (error: string) => void;
   reset: () => void;
@@ -38,6 +40,7 @@ const initialState = {
   invoice: null as Invoice | null,
   localOcr: null as OCRResult | null,
   parsedReceipt: null as ParsedReceipt | null,
+  parseResult: null as ParseResult | null,
 };
 
 export const useReceiptStore = create<ReceiptState>((set) => ({
@@ -55,6 +58,7 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
   setInvoice: (invoice) => set({ invoice }),
   setLocalOcr: (result) => set({ localOcr: result }),
   setParsedReceipt: (parsed) => set({ parsedReceipt: parsed }),
+  setParseResult: (result) => set({ parseResult: result }),
   setStep: (step) => set({ step }),
   setError: (error) => set({ error, step: 'error' }),
   reset: () => set(initialState),

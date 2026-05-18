@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react';
 import { uploadReceiptImage, processOcr } from '../api/receipts';
 import { useReceiptStore } from '../store/receiptStore';
 import { recognizeText } from '../services/ocrService';
-import { parseReceiptText } from '../services/receiptParser';
+import { parseReceiptSafe } from '../services/receiptParser';
 
 export function useUploadReceipt() {
   const [isUploading, setIsUploading] = useState(false);
-  const { setReceiptId, setStep, setError, setLocalOcr, setParsedReceipt } = useReceiptStore();
+  const { setReceiptId, setStep, setError, setLocalOcr, setParsedReceipt, setParseResult } = useReceiptStore();
 
   const upload = useCallback(async (imageUri: string) => {
     setIsUploading(true);
@@ -35,14 +35,24 @@ export function useUploadReceipt() {
         console.log(`[Upload] Local OCR: ${ocrResult.lines.length} lines, confidence: ${ocrResult.confidence.toFixed(2)}`);
         setLocalOcr(ocrResult);
 
-        // Parse OCR text into structured receipt data
-        try {
-          const parsed = parseReceiptText(ocrResult.text);
-          console.log(`[Upload] Parsed: ${parsed.lineItems.length} items, total: ${parsed.totalAmount}`);
-          setParsedReceipt(parsed);
-        } catch (parseErr: any) {
-          console.warn('[Upload] Parser failed (non-fatal):', parseErr.message);
+        // Parse OCR text into structured receipt data (safe — never throws)
+        const result = parseReceiptSafe(ocrResult.text);
+        setParseResult(result);
+
+        if (result.success) {
+          console.log(`[Upload] Parse SUCCESS: ${result.data.lineItems.length} items, total: ${result.data.totalAmount}, confidence: ${result.confidence}`);
+          setParsedReceipt(result.data);
+        } else {
+          console.warn(`[Upload] Parse FAILED: ${result.reason} (confidence: ${result.confidence})`);
+          // Don't set parsedReceipt — let the UI handle the failure state
         }
+      } else {
+        console.warn('[Upload] No OCR text available');
+        setParseResult({
+          success: false,
+          reason: 'OCR kunde inte läsa texten från bilden',
+          confidence: 0,
+        });
       }
 
       // TODO: Upload actual image binary to S3 pre-signed URL

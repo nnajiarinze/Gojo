@@ -21,6 +21,7 @@ import {
   getReceipt,
 } from '../src/api/receipts';
 import type { LineItem } from '../src/types/api';
+import { CONFIDENCE_HIGH, CONFIDENCE_MEDIUM } from '../src/services/receiptParser';
 
 interface EditableLineItem {
   description: string;
@@ -32,6 +33,7 @@ export default function ResultScreen() {
   const router = useRouter();
   const receipt = useReceiptStore((s) => s.receipt);
   const parsedReceipt = useReceiptStore((s) => s.parsedReceipt);
+  const parseResult = useReceiptStore((s) => s.parseResult);
   const setReceipt = useReceiptStore((s) => s.setReceipt);
   const setInvoiceCreated = useReceiptStore((s) => s.setInvoiceCreated);
   const reset = useReceiptStore((s) => s.reset);
@@ -42,6 +44,15 @@ export default function ResultScreen() {
   // Editable fields — initialize from parsedReceipt if available
   const initialMerchant = (parsedReceipt?.merchantName || receipt?.merchantName) ?? '';
   const [merchantName, setMerchantName] = useState(initialMerchant);
+  const [editMomsSats, setEditMomsSats] = useState<string>(() => {
+    if (parsedReceipt?.vat && parsedReceipt?.subtotal && parsedReceipt.subtotal > 0) {
+      return String(Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100);
+    }
+    return '25';
+  });
+  const [editMomsBelopp, setEditMomsBelopp] = useState<string>(() => {
+    return String(parsedReceipt?.vat ?? 0);
+  });
   const [editItems, setEditItems] = useState<EditableLineItem[]>(() => {
     if (parsedReceipt && parsedReceipt.lineItems.length > 0) {
       return parsedReceipt.lineItems.map((li: any) => ({
@@ -61,6 +72,10 @@ export default function ResultScreen() {
       const ts = Date.now();
       console.log(`[Result] AUTO-HYDRATE @ ${ts}: ${parsedReceipt.lineItems.length} items, VAT: ${parsedReceipt.vat} (${parsedReceipt.debug.vatSource}), Kontrollenhet: ${parsedReceipt.kontrollenhet || '(missing)'}`);
       setMerchantName(parsedReceipt.merchantName || receipt?.merchantName || '');
+      if (parsedReceipt.vat != null) setEditMomsBelopp(String(parsedReceipt.vat));
+      if (parsedReceipt.subtotal && parsedReceipt.subtotal > 0 && parsedReceipt.vat != null) {
+        setEditMomsSats(String(Math.round((parsedReceipt.vat / parsedReceipt.subtotal) * 10000) / 100));
+      }
       setEditItems(
         parsedReceipt.lineItems.map((li: any) => ({
           description: li.description,
@@ -195,6 +210,17 @@ export default function ResultScreen() {
       Alert.alert('Error', 'Cannot generate invoice with zero line items.');
       return;
     }
+
+    // ── Block invoice generation on low confidence without manual review ──
+    if (confidence < CONFIDENCE_MEDIUM && !editing) {
+      Alert.alert(
+        'Låg konfidens',
+        'Parsningsresultatet har låg konfidens. Redigera och granska datan innan fakturan skapas.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     for (const li of finalLineItems) {
       if (li.total <= 0 || !li.description) {
         Alert.alert('Error', `Invalid line item: "${li.description || '(empty)'}". All items must have a description and positive total.`);
@@ -240,12 +266,26 @@ export default function ResultScreen() {
         return;
       }
 
+      // Use editable MOMS values (user may have corrected them)
+      const taxRate = parseFloat(editMomsSats) || 25;
+      const taxAmount = parseFloat(editMomsBelopp) || 0;
+
+      // Validate MOMS
+      if (taxRate < 0 || taxRate > 100) {
+        Alert.alert('Ogiltig MOMS-sats', 'MOMS-sats måste vara mellan 0 och 100%.');
+        return;
+      }
+      if (taxAmount < 0) {
+        Alert.alert('Ogiltigt MOMS-belopp', 'MOMS-belopp kan inte vara negativt.');
+        return;
+      }
+
       const res = await generateInvoice({
         receiptId: receipt.id,
         customerId: mockCustomerId,
         dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        taxRate: 25,
-        taxAmount: parsedReceipt?.vat ?? undefined,
+        taxRate,
+        taxAmount: taxAmount || undefined,
         subtotal: parsedReceipt?.subtotal ?? undefined,
         totalAmount: parsedReceipt?.totalAmount ?? undefined,
         lineItems: finalLineItems,
@@ -337,6 +377,32 @@ export default function ResultScreen() {
         </View>
 
         <View style={styles.editCard}>
+          <Text style={styles.editSectionTitle}>MOMS</Text>
+          <View style={styles.editRow}>
+            <View style={styles.editCol}>
+              <Text style={styles.editMiniLabel}>MOMS-sats (%)</Text>
+              <TextInput
+                style={styles.inputSmall}
+                value={editMomsSats}
+                onChangeText={setEditMomsSats}
+                keyboardType="numeric"
+                placeholder="25"
+              />
+            </View>
+            <View style={styles.editCol}>
+              <Text style={styles.editMiniLabel}>MOMS-belopp (SEK)</Text>
+              <TextInput
+                style={styles.inputSmall}
+                value={editMomsBelopp}
+                onChangeText={setEditMomsBelopp}
+                keyboardType="numeric"
+                placeholder="0"
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.editCard}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal</Text>
             <Text style={styles.totalValue}>SEK {computeSubtotal().toFixed(2)}</Text>
@@ -365,10 +431,82 @@ export default function ResultScreen() {
     );
   }
 
+  // ── Confidence level ──
+  const confidence = parseResult?.confidence ?? parsedReceipt?.confidence ?? 0;
+  const isLowConfidence = confidence < CONFIDENCE_MEDIUM;
+  const isMediumConfidence = confidence >= CONFIDENCE_MEDIUM && confidence < CONFIDENCE_HIGH;
+
+  // ── Parser failure state (local OCR failed to extract data) ──
+  const parserFailed = parseResult && !parseResult.success;
+
   // ── VIEW MODE ──
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <StatusBadge status={status} />
+
+      {/* Parser failure UI — shows when local OCR couldn't parse the receipt */}
+      {parserFailed && status !== 'failed' && status !== 'invoiced' && (
+        <View style={styles.parseFailCard}>
+          <Text style={styles.parseFailIcon}>⚠️</Text>
+          <Text style={styles.parseFailTitle}>Kunde inte tolka kvittot</Text>
+          <Text style={styles.parseFailMessage}>{parseResult.reason}</Text>
+          {parseResult.partialData && (
+            <View style={styles.partialDataSection}>
+              <Text style={styles.partialDataLabel}>Delvis data:</Text>
+              {parseResult.partialData.merchantName && (
+                <Text style={styles.partialDataItem}>• Butik: {parseResult.partialData.merchantName}</Text>
+              )}
+              {parseResult.partialData.totalAmount && (
+                <Text style={styles.partialDataItem}>• Total: {parseResult.partialData.totalAmount} SEK</Text>
+              )}
+              {parseResult.partialData.kontrollenhet && (
+                <Text style={styles.partialDataItem}>• Kontrollenhet: {parseResult.partialData.kontrollenhet}</Text>
+              )}
+            </View>
+          )}
+          <View style={styles.parseFailActions}>
+            <TouchableOpacity
+              style={[styles.button, styles.editBtn]}
+              onPress={() => {
+                // Prefill from partial data if available
+                if (parseResult.partialData?.merchantName) {
+                  setMerchantName(parseResult.partialData.merchantName);
+                }
+                setEditing(true);
+              }}
+            >
+              <Text style={styles.buttonText}>Fyll i manuellt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryBtn]}
+              onPress={() => {
+                reset();
+                router.dismissAll();
+              }}
+            >
+              <Text style={styles.secondaryBtnText}>Försök igen</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Confidence warning banner */}
+      {!parserFailed && isMediumConfidence && status !== 'failed' && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>
+            ⚠️ Kontrollera uppgifterna innan fakturan skapas (konfidens: {Math.round(confidence * 100)}%)
+          </Text>
+        </View>
+      )}
+
+      {/* Low confidence block */}
+      {!parserFailed && isLowConfidence && parsedReceipt && status !== 'failed' && (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>
+            🚫 Låg konfidens ({Math.round(confidence * 100)}%) — granska och redigera innan faktura kan skapas
+          </Text>
+        </View>
+      )}
 
       {status === 'failed' && (
         <ErrorState
@@ -381,11 +519,11 @@ export default function ResultScreen() {
         />
       )}
 
-      {['extracted', 'reviewed', 'invoice_ready', 'invoiced'].includes(status) && (
+      {!parserFailed && ['extracted', 'reviewed', 'invoice_ready', 'invoiced'].includes(status) && (
         <ReceiptDataView receipt={receipt} parsedReceipt={parsedReceipt} />
       )}
 
-      {status === 'extracted' && (
+      {status === 'extracted' && !parserFailed && (
         <>
           <TouchableOpacity
             style={[styles.button, styles.editBtn]}
@@ -522,4 +660,16 @@ const styles = StyleSheet.create({
   debugText: { fontSize: 11, color: '#78350F', fontFamily: 'monospace', marginBottom: 2 },
   debugItem: { fontSize: 11, color: '#92400E', fontFamily: 'monospace', marginLeft: 8, marginBottom: 1 },
   debugWarn: { fontSize: 10, color: '#B45309', fontFamily: 'monospace', marginTop: 6 },
+  // Parser failure UI
+  parseFailCard: { alignItems: 'center', padding: 24, marginHorizontal: 16, marginTop: 16, backgroundColor: '#FEF2F2', borderRadius: 16, borderWidth: 1, borderColor: '#FECACA' },
+  parseFailIcon: { fontSize: 40, marginBottom: 8 },
+  parseFailTitle: { fontSize: 18, fontWeight: '700', color: '#991B1B', marginBottom: 8 },
+  parseFailMessage: { fontSize: 14, color: '#7F1D1D', textAlign: 'center', marginBottom: 16, lineHeight: 20 },
+  partialDataSection: { backgroundColor: '#FFF7ED', padding: 12, borderRadius: 8, width: '100%', marginBottom: 16 },
+  partialDataLabel: { fontSize: 12, fontWeight: '700', color: '#9A3412', marginBottom: 4 },
+  partialDataItem: { fontSize: 13, color: '#7C2D12', marginBottom: 2 },
+  parseFailActions: { width: '100%' },
+  // Confidence warning banner
+  warningBanner: { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 10, marginHorizontal: 16, marginTop: 12, padding: 12 },
+  warningText: { fontSize: 13, color: '#92400E', textAlign: 'center', fontWeight: '500' },
 });
