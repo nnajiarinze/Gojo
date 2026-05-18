@@ -260,21 +260,12 @@ export default function ResultScreen() {
     // ── Debug: confirm data source ──
     const reviewedSubtotal = finalLineItems.reduce((s, li) => s + li.total, 0);
     const vatValue = parsedReceipt?.vat ?? null;
-    console.log('[Invoice] ═══ GENERATE INVOICE INPUT ═══');
-    console.log(`[Invoice] Source: finalReviewedReceiptState (editItems)`);
-    console.log(`[Invoice] Line items: ${finalLineItems.length}`);
-    console.log(`[Invoice] Subtotal (reviewed): ${reviewedSubtotal.toFixed(2)}`);
-    console.log(`[Invoice] VAT (MOMS): ${vatValue} (source: ${parsedReceipt?.debug?.vatSource ?? 'n/a'})`);
-    console.log(`[Invoice] Kontrollenhet: ${legal?.kontrollenhet || '(missing)'}`);
-    console.log(`[Invoice] Merchant: ${merchantName}`);
     if (legal) {
-      console.log(`[Invoice] Legal: ${JSON.stringify(legal)}`);
       if (!legal.kontrollenhet) console.warn('[Invoice] ⚠ Missing Kontrollenhet');
       if (!legal.orgNumber) console.warn('[Invoice] ⚠ Missing OrgNumber');
     } else {
       console.warn('[Invoice] ⚠ No parsed receipt — legal metadata missing');
     }
-    console.log('[Invoice] ═══════════════════════════════');
 
     setLoading(true);
     try {
@@ -511,20 +502,18 @@ export default function ResultScreen() {
         </View>
       )}
 
-      {/* Confidence warning banner */}
       {!parserFailed && isMediumConfidence && status !== 'failed' && (
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>
-            ⚠️ Kontrollera uppgifterna innan fakturan skapas (konfidens: {Math.round(confidence * 100)}%)
+            ⚠️ Kontrollera uppgifterna innan fakturan skapas
           </Text>
         </View>
       )}
 
-      {/* Low confidence block */}
       {!parserFailed && isLowConfidence && parsedReceipt && status !== 'failed' && (
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>
-            🚫 Låg konfidens ({Math.round(confidence * 100)}%) — granska och redigera innan faktura kan skapas
+            🚫 Granska och redigera innan faktura kan skapas
           </Text>
         </View>
       )}

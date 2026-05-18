@@ -45,6 +45,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Gojo uses the local network to connect to the development server.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Gojo needs camera access to scan receipts.</string>
 	<key>NSMicrophoneUsageDescription</key>

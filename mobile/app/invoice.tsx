@@ -322,9 +322,7 @@ export default function InvoiceScreen() {
         <Text style={styles.homeBtnText}>Done — Scan Another</Text>
       </TouchableOpacity>
 
-      <Text style={styles.debug}>
-        Invoice ID: {invoice.id?.slice(0, 8)}… | Status: {invoice.status}
-      </Text>
+
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -500,13 +498,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 8,
   },
-  debug: {
-    marginTop: 16,
-    fontSize: 11,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
+
   successEmoji: { fontSize: 32, marginBottom: 4 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F3E8FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 4 },
   statusPillText: { fontSize: 13, color: '#7C3AED', fontWeight: '600' },

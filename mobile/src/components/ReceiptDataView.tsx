@@ -23,21 +23,12 @@ export function ReceiptDataView({ receipt, parsedReceipt }: ReceiptDataViewProps
   const subtotal = hasParsed ? parsedReceipt!.subtotal : receipt.subtotal;
   const vat = hasParsed ? parsedReceipt!.vat : receipt.taxAmount;
   const totalAmount = hasParsed ? parsedReceipt!.totalAmount : receipt.totalAmount;
-  const confidence = hasParsed ? parsedReceipt!.confidence : receipt.confidence;
-  const vatSource = hasParsed ? parsedReceipt!.debug.vatSource : 'backend';
 
   const kontrollenhet = parsedReceipt?.kontrollenhet || '';
   const legal = parsedReceipt?.merchantLegalInfo;
 
-  console.log(`[ReceiptDataView] Hydrating — source: ${hasParsed ? 'LOCAL_OCR' : 'BACKEND'}, items: ${lineItems.length}, VAT: ${vat} (${vatSource}), Kontrollenhet: ${kontrollenhet || '(missing)'}`);
-
   return (
     <View style={styles.container}>
-      {hasParsed && (
-        <View style={styles.sourceTag}>
-          <Text style={styles.sourceTagText}>📱 Lokal OCR-analys</Text>
-        </View>
-      )}
 
       <Field label="Restaurang" value={merchantName} />
       <Field label="Datum" value={receipt.receiptDate} />
@@ -63,7 +54,7 @@ export function ReceiptDataView({ receipt, parsedReceipt }: ReceiptDataViewProps
 
       <Field label="Netto" value={fmtC(currency, subtotal)} />
       <Field label="MOMS-sats" value={subtotal && vat && subtotal > 0 ? `${Math.round((vat / subtotal) * 10000) / 100}%` : '—'} />
-      <Field label={`MOMS-belopp (${vatSource})`} value={fmtC(currency, vat)} />
+      <Field label="MOMS-belopp" value={fmtC(currency, vat)} />
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Totalt</Text>
         <Text style={styles.totalValue}>{fmtC(currency, totalAmount)}</Text>
@@ -92,11 +83,7 @@ export function ReceiptDataView({ receipt, parsedReceipt }: ReceiptDataViewProps
         </View>
       )}
 
-      {confidence != null && (
-        <Text style={styles.confidence}>
-          Konfidens: {Math.round(confidence * 100)}%
-        </Text>
-      )}
+
     </View>
   );
 }
@@ -117,15 +104,7 @@ function fmtC(currency: string, n: number | null | undefined): string {
 
 const styles = StyleSheet.create({
   container: { padding: 20 },
-  sourceTag: {
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  sourceTagText: { fontSize: 11, fontWeight: '600', color: '#1D4ED8' },
+
   field: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -169,10 +148,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   warningText: { fontSize: 12, color: '#92400E', fontWeight: '600' },
-  confidence: {
-    marginTop: 16,
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-  },
+
 });
