@@ -28,12 +28,10 @@ export default function ProcessingScreen() {
   const stepAtMount = useRef(step);
   const hasNavigated = useRef(false);
 
-  console.log(`[Processing] Render — step: ${step}, stepAtMount: ${stepAtMount.current}, hasNavigated: ${hasNavigated.current}`);
 
   // Start upload when entering screen
   useEffect(() => {
     if (imageUri && step === 'capturing') {
-      console.log('[Processing] Starting upload');
       upload(imageUri);
     }
   }, [imageUri, step]);
@@ -52,14 +50,12 @@ export default function ProcessingScreen() {
       stepAtMount.current !== 'done' // <-- key guard: skip if already done on mount
     ) {
       hasNavigated.current = true;
-      console.log(`[Processing] TRANSITION detected (${stepAtMount.current} → done), navigating to /result, status: ${receipt.status}`);
       // Replace: processing is a transient waiting screen. It should not
       // remain in the back stack. Back from Result goes straight to Home.
       router.replace('/result');
     } else if (step === 'done' && stepAtMount.current === 'done') {
       // User navigated back to this screen — step was already 'done'.
       // Do NOT push forward. Let the user use the back button normally.
-      console.log('[Processing] Step already done on mount — NOT navigating (back-nav safe)');
     }
   }, [step, receipt]);
 
@@ -69,7 +65,6 @@ export default function ProcessingScreen() {
         <ErrorState
           message={error ?? 'Something went wrong'}
           onRetry={() => {
-            console.log('[Processing] Error retry — resetting and going back');
             reset();
             router.back();
           }}
@@ -84,9 +79,6 @@ export default function ProcessingScreen() {
     return (
       <View style={styles.container}>
         <Text style={styles.hint}>Processing complete.</Text>
-        <Text style={styles.debug}>
-          Use the back button or navigate forward.
-        </Text>
       </View>
     );
   }
@@ -100,9 +92,7 @@ export default function ProcessingScreen() {
         {step === 'processing' && 'Extracting receipt data…'}
         {step === 'idle' && 'Initializing…'}
       </Text>
-      {receiptId && (
-        <Text style={styles.debug}>ID: {receiptId.slice(0, 8)}…</Text>
-      )}
+
     </View>
   );
 }
@@ -122,10 +112,5 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  debug: {
-    marginTop: 24,
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontFamily: 'monospace',
-  },
+
 });
