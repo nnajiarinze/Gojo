@@ -12,10 +12,12 @@ import { config } from '../config/env';
  * Returns the local file URI on success.
  */
 export async function downloadAndShareInvoicePdf(invoice: Invoice): Promise<string> {
+  const legacyStatus = invoice.status as string | undefined;
+  const pdfStatus = invoice.pdfStatus ?? (legacyStatus === 'sent' ? 'ready' : legacyStatus);
   console.log('[PDF] ═══ DOWNLOADING PDF ═══');
-  console.log(`[PDF] Invoice: ${invoice.invoiceNumber}, pdfStatus: ${invoice.pdfStatus}`);
+  console.log(`[PDF] Invoice: ${invoice.invoiceNumber}, pdfStatus: ${pdfStatus}`);
 
-  if (invoice.pdfStatus === 'generating_pdf') {
+  if (pdfStatus === 'generating_pdf') {
     throw new Error('PDF håller på att genereras. Försök igen om en stund.');
   }
 
