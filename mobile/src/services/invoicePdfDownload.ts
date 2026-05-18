@@ -13,9 +13,9 @@ import { config } from '../config/env';
  */
 export async function downloadAndShareInvoicePdf(invoice: Invoice): Promise<string> {
   console.log('[PDF] ═══ DOWNLOADING PDF ═══');
-  console.log(`[PDF] Invoice: ${invoice.invoiceNumber}, status: ${invoice.status}`);
+  console.log(`[PDF] Invoice: ${invoice.invoiceNumber}, pdfStatus: ${invoice.pdfStatus}`);
 
-  if (invoice.status === 'generating_pdf') {
+  if (invoice.pdfStatus === 'generating_pdf') {
     throw new Error('PDF håller på att genereras. Försök igen om en stund.');
   }
 

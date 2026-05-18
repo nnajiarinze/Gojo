@@ -41,7 +41,7 @@ const worker = new Worker<InvoiceJobPayload>(
     }
 
     // 4. Mark invoice as ready with real pdfUrl
-    await invoiceRepo.updateInvoiceStatus(invoiceId, 'ready', { pdfUrl });
+    await invoiceRepo.updateInvoicePdfStatus(invoiceId, 'ready', { pdfUrl });
     await invoiceRepo.logInvoiceEvent(invoiceId, 'pdf_completed', {
       pdfUrl,
       byteSize: pdfBuffer.length,
@@ -58,7 +58,7 @@ const worker = new Worker<InvoiceJobPayload>(
 worker.on('failed', (job, err) => {
   console.error(`[Invoice Worker] Job ${job?.id} FAILED:`, err.message);
   if (job?.data?.invoiceId) {
-    invoiceRepo.updateInvoiceStatus(job.data.invoiceId, 'failed').catch(() => {});
+    invoiceRepo.updateInvoicePdfStatus(job.data.invoiceId, 'failed').catch(() => {});
     invoiceRepo.logInvoiceEvent(job.data.invoiceId, 'pdf_failed', { error: err.message }).catch(() => {});
   }
 });

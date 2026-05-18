@@ -1,5 +1,7 @@
 export type ReceiptStatus = 'uploaded' | 'processing' | 'extracted' | 'reviewed' | 'invoice_ready' | 'invoiced' | 'failed';
-export type InvoiceStatus = 'draft' | 'generating_pdf' | 'ready' | 'sent' | 'failed';
+export type InvoicePdfStatus = 'draft' | 'generating_pdf' | 'ready' | 'failed';
+export type EmailDeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed';
+export type PaymentStatus = 'unpaid' | 'paid' | 'partially_paid' | 'overdue';
 export type EventType = 'created' | 'ocr_started' | 'ocr_completed' | 'ocr_failed' | 'pdf_started' | 'pdf_completed' | 'pdf_failed' | 'email_sent' | 'email_failed' | 'state_changed' | 'invoice_created' | 'invoice_failed';
 
 export interface User {
@@ -77,7 +79,11 @@ export interface Invoice {
   currency: string;
   notes: string | null;
   pdfUrl: string | null;
-  status: InvoiceStatus;
+  pdfStatus: InvoicePdfStatus;
+  emailStatus: EmailDeliveryStatus;
+  paymentStatus: PaymentStatus;
+  /** @deprecated Use pdfStatus for PDF readiness, emailStatus for delivery, paymentStatus for payment state. */
+  status: InvoicePdfStatus;
   legalMetadata: InvoiceLegalMetadata | null;
   sentAt: Date | null;
   createdAt: Date;

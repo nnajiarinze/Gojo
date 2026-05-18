@@ -39,6 +39,10 @@ export const sendEmailSchema = z.object({
   body: z.string().min(1).max(5000),
 });
 
+export const updatePaymentStatusSchema = z.object({
+  paymentStatus: z.enum(['unpaid', 'paid']),
+});
+
 export const idParamSchema = z.object({
   id: z.string().uuid(),
 });

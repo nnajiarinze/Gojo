@@ -77,7 +77,7 @@ export async function sendInvoiceEmail(params: {
   to: string;
   subject: string;
   body: string;
-}): Promise<{ emailId: string; status: string; sentAt: string }> {
+}): Promise<{ emailId: string; emailStatus: string; status?: string; sentAt: string }> {
   const res = await apiClient.post('/send-email', params);
   console.log('[API] sendInvoiceEmail response:', res.data);
   return res.data;

@@ -3,6 +3,8 @@ import { env } from '../config/env.js';
 import { query, queryOne } from '../config/database.js';
 import * as emailService from '../services/email.service.js';
 
+type AdminPaymentStatus = 'unpaid' | 'paid';
+
 // ─── Token guard ────────────────────────────────────────────────────────────
 
 async function requireAdminToken(request: FastifyRequest, reply: FastifyReply) {
@@ -17,6 +19,9 @@ const guardedRoute = { preHandler: requireAdminToken };
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function parseInvoiceRow(row: any) {
+  const pdfStatus = normalizePdfStatus(row.pdf_status ?? row.status);
+  const emailStatus = normalizeEmailStatus(row.email_status ?? (row.status === 'sent' || row.sent_at ? 'sent' : 'pending'));
+  const paymentStatus = normalizePaymentStatus(row.payment_status ?? 'unpaid');
   return {
     id: row.id,
     userId: row.user_id,
@@ -32,12 +37,31 @@ function parseInvoiceRow(row: any) {
     currency: row.currency?.trim() ?? 'SEK',
     notes: row.notes,
     pdfUrl: row.pdf_url,
-    status: row.status,
+    pdfStatus,
+    emailStatus,
+    paymentStatus,
+    status: pdfStatus,
     legalMetadata: row.legal_metadata ?? null,
     sentAt: row.sent_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function normalizePdfStatus(value: string | null | undefined) {
+  if (value === 'sent') return 'ready';
+  if (value === 'draft' || value === 'generating_pdf' || value === 'ready' || value === 'failed') return value;
+  return 'draft';
+}
+
+function normalizeEmailStatus(value: string | null | undefined) {
+  if (value === 'pending' || value === 'sending' || value === 'sent' || value === 'failed') return value;
+  return 'pending';
+}
+
+function normalizePaymentStatus(value: string | null | undefined) {
+  if (value === 'paid' || value === 'partially_paid' || value === 'overdue') return value;
+  return 'unpaid';
 }
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
@@ -157,10 +181,38 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         body: `Bifogat finner du faktura ${row.invoice_number}.`,
       });
 
-      return reply.send({ status: 'sent', emailId: result.emailId });
+      return reply.send({ emailStatus: 'sent', status: 'sent', emailId: result.emailId });
     } catch (err: any) {
       return reply.code(500).send({ error: err.message });
     }
+  });
+
+  // ── Update payment status ──────────────────────────────────────────────
+  app.patch('/invoices/:id/payment-status', { ...guardedRoute }, async (request, reply) => {
+    const { id } = request.params as any;
+    const { paymentStatus } = (request.body as any) ?? {};
+
+    if (paymentStatus !== 'unpaid' && paymentStatus !== 'paid') {
+      return reply.code(400).send({ error: 'paymentStatus must be "unpaid" or "paid"' });
+    }
+
+    const updated = await queryOne<any>(
+      `UPDATE invoices
+       SET payment_status = $2::invoice_payment_status
+       WHERE id = $1
+       RETURNING *`,
+      [id, paymentStatus satisfies AdminPaymentStatus]
+    );
+
+    if (!updated) return reply.code(404).send({ error: 'Invoice not found' });
+
+    await query(
+      `INSERT INTO invoice_events (id, invoice_id, event, metadata)
+       VALUES (gen_random_uuid(), $1, 'state_changed', $2)`,
+      [id, JSON.stringify({ field: 'paymentStatus', paymentStatus })]
+    );
+
+    return reply.send(parseInvoiceRow(updated));
   });
 }
 
@@ -188,12 +240,19 @@ const ADMIN_HTML = `<!DOCTYPE html>
   tr { cursor: pointer; }
   .status { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
   .status-ready { background: #d4edda; color: #155724; }
+  .status-pending { background: #e2e3e5; color: #383d41; }
+  .status-sending { background: #fff3cd; color: #856404; }
   .status-sent { background: #cce5ff; color: #004085; }
+  .status-paid { background: #d1fae5; color: #065f46; }
+  .status-unpaid { background: #fee2e2; color: #991b1b; }
+  .status-failed { background: #f8d7da; color: #721c24; }
   .status-generating_pdf { background: #fff3cd; color: #856404; }
   .status-draft { background: #e2e3e5; color: #383d41; }
   .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
   .btn-primary { background: #111; color: #fff; }
   .btn-primary:hover { background: #333; }
+  .btn-muted { background: #f3f4f6; color: #374151; }
+  .btn-muted:hover { background: #e5e7eb; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
@@ -272,16 +331,18 @@ function formatAmount(n) {
   return Number(n).toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function statusBadge(s) {
-  return '<span class="status status-' + (s||'draft') + '">' + (s||'draft') + '</span>';
+function humanizeStatus(s) {
+  return String(s || '—').replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
 }
 
-function emailStatus(events) {
-  if (!events || !events.length) return '<span style="color:#888">—</span>';
-  const last = events[0];
-  if (last.event === 'email_sent') return '<span style="color:#155724">✓ Sent</span>';
-  if (last.event === 'email_failed') return '<span style="color:#dc3545">✗ Failed</span>';
-  return '<span style="color:#888">' + last.event + '</span>';
+function statusBadge(s) {
+  return '<span class="status status-' + (s||'draft') + '">' + humanizeStatus(s||'draft') + '</span>';
+}
+
+function paymentControl(inv) {
+  const next = inv.paymentStatus === 'paid' ? 'unpaid' : 'paid';
+  const label = inv.paymentStatus === 'paid' ? 'Mark unpaid' : 'Mark paid';
+  return statusBadge(inv.paymentStatus) + ' <button class="btn btn-sm btn-muted" onclick="event.stopPropagation(); updatePaymentStatus(&apos;' + inv.id + '&apos;, &apos;' + next + '&apos;)">' + label + '</button>';
 }
 
 // ── List view ─────────────────────────────────────────────────────────────
@@ -302,16 +363,16 @@ function renderList() {
   if (!invoices.length) { app.innerHTML = '<div class="empty">No invoices found</div>'; return; }
 
   let html = '<div class="card"><h2>Invoices (' + total + ')</h2><table><thead><tr>'
-    + '<th>Invoice #</th><th>Date</th><th>Total</th><th>Status</th><th>Email</th>'
+    + '<th>Invoice #</th><th>Customer</th><th>Total</th><th>Email Status</th><th>Payment Status</th>'
     + '</tr></thead><tbody>';
 
   for (const inv of invoices) {
     html += '<tr onclick="loadDetail(&apos;' + inv.id + '&apos;)">'
       + '<td>' + inv.invoiceNumber + '</td>'
-      + '<td>' + formatDate(inv.issueDate) + '</td>'
+      + '<td>' + ((inv.legalMetadata && inv.legalMetadata.companyName) || 'Gojo') + '</td>'
       + '<td class="amount">' + formatAmount(inv.totalAmount) + ' ' + (inv.currency||'SEK') + '</td>'
-      + '<td>' + statusBadge(inv.status) + '</td>'
-      + '<td>' + emailStatus(inv.emailEvents) + '</td>'
+      + '<td>' + statusBadge(inv.emailStatus) + '</td>'
+      + '<td>' + paymentControl(inv) + '</td>'
       + '</tr>';
   }
 
@@ -347,7 +408,9 @@ function renderDetail(inv) {
 
   // Metadata
   html += '<div class="card"><h2>' + inv.invoiceNumber + '</h2><div class="meta-grid">'
-    + mi('Status', statusBadge(inv.status))
+    + mi('PDF Status', statusBadge(inv.pdfStatus))
+    + mi('Email Status', statusBadge(inv.emailStatus))
+    + mi('Payment Status', paymentControl(inv))
     + mi('Issue Date', formatDate(inv.issueDate))
     + mi('Due Date', formatDate(inv.dueDate))
     + mi('Currency', inv.currency || 'SEK')
@@ -440,6 +503,19 @@ async function resendEmail(id) {
     status.innerHTML = '<span style="color:#dc3545">✗ ' + e.message + '</span>';
   }
   btn.disabled = false;
+}
+
+async function updatePaymentStatus(id, paymentStatus) {
+  try {
+    await api('/invoices/' + id + '/payment-status', {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentStatus }),
+    });
+    if (currentView === 'detail') loadDetail(id);
+    else loadList(listData.page || 1);
+  } catch (e) {
+    alert(e.message || 'Failed to update payment status');
+  }
 }
 
 // Handle browser back/forward  

@@ -23,7 +23,7 @@ export async function sendInvoiceEmail(params: {
   const invoice = await invoiceRepo.getInvoiceById(invoiceId, userId);
   if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
 
-  console.log(`[Email] Invoice: ${invoice.invoiceNumber}, status=${invoice.status}, pdfUrl=${invoice.pdfUrl}`);
+  console.log(`[Email] Invoice: ${invoice.invoiceNumber}, pdfStatus=${invoice.pdfStatus}, emailStatus=${invoice.emailStatus}, pdfUrl=${invoice.pdfUrl}`);
 
   // 2. Validate PDF exists
   if (!invoice.pdfUrl) {
@@ -43,12 +43,14 @@ export async function sendInvoiceEmail(params: {
     throw new Error(`PDF seems invalid (only ${pdfBuffer.length} bytes)`);
   }
 
+  await invoiceRepo.updateInvoiceEmailStatus(invoiceId, 'sending');
+
   // 4. Send via Resend
   if (!env.RESEND_API_KEY) {
     // Dev mode — no Resend key, just log and mark sent
     console.log(`[Email] No RESEND_API_KEY — skipping actual send (dev mode)`);
     const sentAt = new Date();
-    await invoiceRepo.updateInvoiceStatus(invoiceId, 'sent', { sentAt });
+    await invoiceRepo.updateInvoiceEmailStatus(invoiceId, 'sent', { sentAt });
     await invoiceRepo.logInvoiceEvent(invoiceId, 'email_sent', {
       to, subject, sentAt: sentAt.toISOString(), devMode: true, pdfBytes: pdfBuffer.length,
     });
@@ -73,6 +75,7 @@ export async function sendInvoiceEmail(params: {
 
   if (error) {
     console.error(`[Email] Resend error:`, error);
+    await invoiceRepo.updateInvoiceEmailStatus(invoiceId, 'failed');
     await invoiceRepo.logInvoiceEvent(invoiceId, 'email_failed', {
       to, error: error.message,
     });
@@ -81,9 +84,9 @@ export async function sendInvoiceEmail(params: {
 
   console.log(`[Email] Resend success: id=${data?.id}`);
 
-  // 5. Update invoice status
+  // 5. Update email delivery status
   const sentAt = new Date();
-  await invoiceRepo.updateInvoiceStatus(invoiceId, 'sent', { sentAt });
+  await invoiceRepo.updateInvoiceEmailStatus(invoiceId, 'sent', { sentAt });
   await invoiceRepo.logInvoiceEvent(invoiceId, 'email_sent', {
     to, subject, resendId: data?.id, sentAt: sentAt.toISOString(), pdfBytes: pdfBuffer.length,
   });

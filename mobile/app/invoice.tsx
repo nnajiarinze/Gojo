@@ -40,19 +40,19 @@ export default function InvoiceScreen() {
 
   // Auto-poll while invoice is generating PDF
   useEffect(() => {
-    if (!invoice || invoice.status !== 'generating_pdf') return;
+    if (!invoice || invoice.pdfStatus !== 'generating_pdf') return;
     const interval = setInterval(async () => {
       try {
         const updated = await getInvoice(invoice.id);
-        if (updated.status !== 'generating_pdf') {
+        if (updated.pdfStatus !== 'generating_pdf') {
           setInvoice(updated);
           clearInterval(interval);
-          console.log(`[Invoice] PDF ready — status: ${updated.status}`);
+          console.log(`[Invoice] PDF ready — pdfStatus: ${updated.pdfStatus}`);
         }
       } catch { /* ignore polling errors */ }
     }, 2000);
     return () => clearInterval(interval);
-  }, [invoice?.status]);
+  }, [invoice?.pdfStatus]);
 
   async function fetchInvoice(invoiceId: string) {
     setLoading(true);
@@ -116,7 +116,7 @@ export default function InvoiceScreen() {
         <Text style={styles.successEmoji}>✅</Text>
         <Text style={styles.invoiceTitle}>FAKTURA</Text>
         <Text style={styles.invoiceNumber}>{invoice.invoiceNumber}</Text>
-        {invoice.status === 'generating_pdf' ? (
+        {invoice.pdfStatus === 'generating_pdf' ? (
           <View style={styles.statusPill}>
             <ActivityIndicator size="small" color="#7C3AED" />
             <Text style={styles.statusPillText}>PDF genereras...</Text>
@@ -126,6 +126,11 @@ export default function InvoiceScreen() {
             <Text style={styles.statusPillReadyText}>Redo</Text>
           </View>
         )}
+        <View style={invoice.paymentStatus === 'paid' ? styles.paymentPillPaid : styles.paymentPillUnpaid}>
+          <Text style={invoice.paymentStatus === 'paid' ? styles.paymentPillPaidText : styles.paymentPillUnpaidText}>
+            {invoice.paymentStatus === 'paid' ? 'Betald' : 'Obetald'}
+          </Text>
+        </View>
       </View>
 
       {/* Restaurant / Legal info */}
@@ -201,7 +206,7 @@ export default function InvoiceScreen() {
       )}
 
       {/* ─── Send Email Section ─── */}
-      {(invoice.status === 'ready' || invoice.status === 'sent' || invoice.status === 'generating_pdf') && (
+      {(invoice.pdfStatus === 'ready' || invoice.pdfStatus === 'generating_pdf') && (
         <View style={styles.emailSection}>
           <Text style={styles.sectionTitle}>SKICKA FAKTURA VIA E-POST</Text>
 
@@ -271,12 +276,12 @@ export default function InvoiceScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.sendBtnText}>
-                {invoice.status === 'sent' ? '📧 Skicka igen' : '📧 Skicka faktura'}
+                {invoice.emailStatus === 'sent' ? '📧 Skicka igen' : '📧 Skicka faktura'}
               </Text>
             )}
           </TouchableOpacity>
 
-          {invoice.status === 'sent' && invoice.sentAt && (
+          {invoice.emailStatus === 'sent' && invoice.sentAt && (
             <Text style={styles.sentInfo}>
               Skickad {new Date(invoice.sentAt).toLocaleDateString('sv-SE')}
             </Text>
@@ -299,11 +304,11 @@ export default function InvoiceScreen() {
             setGeneratingPdf(false);
           }
         }}
-        disabled={generatingPdf || invoice.status === 'generating_pdf'}
+        disabled={generatingPdf || invoice.pdfStatus === 'generating_pdf'}
       >
         {generatingPdf ? (
           <ActivityIndicator color="#fff" />
-        ) : invoice.status === 'generating_pdf' ? (
+        ) : invoice.pdfStatus === 'generating_pdf' ? (
           <Text style={styles.pdfBtnText}>⏳ PDF genereras...</Text>
         ) : (
           <Text style={styles.pdfBtnText}>📄 Ladda ner PDF</Text>
@@ -504,4 +509,8 @@ const styles = StyleSheet.create({
   statusPillText: { fontSize: 13, color: '#7C3AED', fontWeight: '600' },
   statusPillReady: { backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 4 },
   statusPillReadyText: { fontSize: 13, color: '#065F46', fontWeight: '700' },
+  paymentPillPaid: { backgroundColor: '#DCFCE7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 8 },
+  paymentPillPaidText: { fontSize: 13, color: '#166534', fontWeight: '800' },
+  paymentPillUnpaid: { backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 8 },
+  paymentPillUnpaidText: { fontSize: 13, color: '#991B1B', fontWeight: '800' },
 });

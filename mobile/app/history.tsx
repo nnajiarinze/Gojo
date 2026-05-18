@@ -13,12 +13,11 @@ import { listInvoices, getInvoice } from '../src/api/receipts';
 import { useReceiptStore } from '../src/store/receiptStore';
 import type { Invoice } from '../src/types/api';
 
-const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  draft:          { label: 'Draft',      color: '#6B7280', bg: '#F3F4F6' },
-  generating_pdf: { label: 'Generating', color: '#D97706', bg: '#FEF3C7' },
-  ready:          { label: 'Ready',      color: '#059669', bg: '#D1FAE5' },
-  sent:           { label: 'Sent',       color: '#7C3AED', bg: '#EDE9FE' },
-  failed:         { label: 'Failed',     color: '#DC2626', bg: '#FEE2E2' },
+const PAYMENT_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  unpaid:         { label: 'Unpaid', color: '#991B1B', bg: '#FEE2E2' },
+  paid:           { label: 'Paid',   color: '#065F46', bg: '#D1FAE5' },
+  partially_paid: { label: 'Partly', color: '#92400E', bg: '#FEF3C7' },
+  overdue:        { label: 'Overdue', color: '#B91C1C', bg: '#FEE2E2' },
 };
 
 export default function HistoryScreen() {
@@ -61,6 +60,9 @@ export default function HistoryScreen() {
       invoiceId: inv.id,
       invoiceNumber: inv.invoiceNumber,
       status: inv.status,
+      pdfStatus: inv.pdfStatus,
+      emailStatus: inv.emailStatus,
+      paymentStatus: inv.paymentStatus,
     });
     setInvoice(inv);
     router.push('/invoice');
@@ -108,7 +110,7 @@ export default function HistoryScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
       renderItem={({ item }) => {
-        const statusInfo = STATUS_LABELS[item.status] ?? STATUS_LABELS.draft;
+        const statusInfo = PAYMENT_STATUS_LABELS[item.paymentStatus] ?? PAYMENT_STATUS_LABELS.unpaid;
         return (
           <TouchableOpacity
             style={styles.card}
@@ -129,6 +131,7 @@ export default function HistoryScreen() {
                 {item.currency} {item.totalAmount.toFixed(2)}
               </Text>
             </View>
+            <Text style={styles.metaText}>Email: {item.emailStatus === 'sent' ? 'Sent' : 'Not sent'}</Text>
           </TouchableOpacity>
         );
       }}
@@ -196,4 +199,5 @@ const styles = StyleSheet.create({
   },
   date: { fontSize: 13, color: '#6B7280' },
   amount: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  metaText: { marginTop: 8, fontSize: 12, color: '#6B7280' },
 });

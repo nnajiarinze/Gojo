@@ -44,6 +44,10 @@ export interface InvoiceLegalMetadata {
   address: string;
 }
 
+export type InvoicePdfStatus = 'draft' | 'generating_pdf' | 'ready' | 'failed';
+export type EmailDeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed';
+export type PaymentStatus = 'unpaid' | 'paid' | 'partially_paid' | 'overdue';
+
 export interface Invoice {
   id: string;
   invoiceNumber: string;
@@ -57,7 +61,11 @@ export interface Invoice {
   currency: string;
   notes: string | null;
   pdfUrl: string | null;
-  status: string;
+  pdfStatus: InvoicePdfStatus;
+  emailStatus: EmailDeliveryStatus;
+  paymentStatus: PaymentStatus;
+  /** @deprecated Use pdfStatus/emailStatus/paymentStatus. */
+  status: InvoicePdfStatus;
   sentAt: string | null;
   receiptId: string;
   legal: InvoiceLegalMetadata | null;
@@ -67,7 +75,11 @@ export interface Invoice {
 export interface InvoiceCreatedResponse {
   invoiceId: string;
   invoiceNumber: string;
-  status: string;
+  pdfStatus: InvoicePdfStatus;
+  emailStatus: EmailDeliveryStatus;
+  paymentStatus: PaymentStatus;
+  /** @deprecated Use pdfStatus. */
+  status: InvoicePdfStatus;
 }
 
 // API request/response types

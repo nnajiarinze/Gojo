@@ -55,6 +55,9 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
         invoiceId: result.invoiceId,
         invoiceNumber: result.invoiceNumber,
         status: 'generating_pdf',
+        pdfStatus: 'generating_pdf',
+        emailStatus: 'pending',
+        paymentStatus: 'unpaid',
       });
     } catch (err: any) {
       if (err instanceof BusinessRuleError) {
@@ -109,7 +112,7 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
     if (!invoice) {
       return reply.code(404).send({ error: 'Invoice not found' });
     }
-    if (!invoice.pdfUrl || invoice.status === 'generating_pdf') {
+    if (!invoice.pdfUrl || invoice.pdfStatus === 'generating_pdf') {
       return reply.code(202).send({ error: 'PDF is still generating. Please try again shortly.' });
     }
 
@@ -142,9 +145,9 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ error: 'Invoice not found' });
     }
 
-    console.log(`[Route] Invoice status=${invoice.status} pdfUrl=${invoice.pdfUrl}`);
+    console.log(`[Route] Invoice pdfStatus=${invoice.pdfStatus} emailStatus=${invoice.emailStatus} pdfUrl=${invoice.pdfUrl}`);
 
-    if (invoice.status !== 'ready' && invoice.status !== 'sent') {
+    if (invoice.pdfStatus !== 'ready') {
       return reply.code(400).send({ error: 'Invoice PDF not ready yet. Please wait a moment.' });
     }
 
@@ -163,6 +166,7 @@ export async function invoiceRoutes(app: FastifyInstance): Promise<void> {
 
       return reply.code(200).send({
         emailId: result.emailId,
+        emailStatus: 'sent',
         status: 'sent',
         sentAt: new Date().toISOString(),
       });

@@ -17,7 +17,7 @@ const worker = new Worker<EmailJobPayload>(
     // In production: download PDF from S3, send via Resend API
     // For now: mark as sent with timestamp
     const sentAt = new Date();
-    await invoiceRepo.updateInvoiceStatus(invoiceId, 'sent', { sentAt });
+    await invoiceRepo.updateInvoiceEmailStatus(invoiceId, 'sent', { sentAt });
     await invoiceRepo.logInvoiceEvent(invoiceId, 'email_sent', {
       to,
       subject,
@@ -35,6 +35,9 @@ const worker = new Worker<EmailJobPayload>(
 
 worker.on('failed', (job, err) => {
   console.error(`[Email Worker] Job ${job?.id} failed:`, err.message);
+  if (job?.data?.invoiceId) {
+    invoiceRepo.updateInvoiceEmailStatus(job.data.invoiceId, 'failed').catch(() => {});
+  }
 });
 
 worker.on('completed', (job) => {

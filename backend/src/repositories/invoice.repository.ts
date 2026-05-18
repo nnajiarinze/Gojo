@@ -1,10 +1,13 @@
 import { query, queryOne, pool } from '../config/database.js';
-import { Invoice, LineItem } from '../types/domain.js';
+import { EmailDeliveryStatus, Invoice, InvoicePdfStatus, LineItem, PaymentStatus } from '../types/domain.js';
 import { randomUUID } from 'node:crypto';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 function rowToInvoice(row: any, lineItems: LineItem[]): Invoice {
+  const pdfStatus = normalizePdfStatus(row.pdf_status ?? row.status);
+  const emailStatus = normalizeEmailStatus(row.email_status ?? (row.status === 'sent' || row.sent_at ? 'sent' : 'pending'));
+  const paymentStatus = normalizePaymentStatus(row.payment_status ?? 'unpaid');
   return {
     id: row.id,
     userId: row.user_id,
@@ -25,12 +28,31 @@ function rowToInvoice(row: any, lineItems: LineItem[]): Invoice {
     currency: row.currency?.trim() ?? 'SEK',
     notes: row.notes,
     pdfUrl: row.pdf_url,
-    status: row.status,
+    pdfStatus,
+    emailStatus,
+    paymentStatus,
+    status: pdfStatus,
     legalMetadata: row.legal_metadata ?? null,
     sentAt: row.sent_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function normalizePdfStatus(value: string | null | undefined): InvoicePdfStatus {
+  if (value === 'sent') return 'ready';
+  if (value === 'draft' || value === 'generating_pdf' || value === 'ready' || value === 'failed') return value;
+  return 'draft';
+}
+
+function normalizeEmailStatus(value: string | null | undefined): EmailDeliveryStatus {
+  if (value === 'pending' || value === 'sending' || value === 'sent' || value === 'failed') return value;
+  return 'pending';
+}
+
+function normalizePaymentStatus(value: string | null | undefined): PaymentStatus {
+  if (value === 'unpaid' || value === 'paid' || value === 'partially_paid' || value === 'overdue') return value;
+  return 'unpaid';
 }
 
 function rowToLineItem(row: any): LineItem {
@@ -98,8 +120,8 @@ export async function createInvoice(params: {
     await client.query(
       `INSERT INTO invoices (id, user_id, receipt_id, customer_id, invoice_number,
          issue_date, due_date, subtotal, tax_rate, tax_amount, total_amount,
-         currency, notes, status, legal_metadata)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8, $9, $10, 'SEK', $11, 'generating_pdf', $12)`,
+         currency, notes, status, pdf_status, email_status, payment_status, legal_metadata)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8, $9, $10, 'SEK', $11, 'generating_pdf', 'generating_pdf', 'pending', 'unpaid', $12)`,
       [
         invoiceId, params.userId, params.receiptId, params.customerId,
         invoiceNumber, params.dueDate, subtotal, params.taxRate,
@@ -169,15 +191,15 @@ export async function listInvoicesByUser(userId: string): Promise<Invoice[]> {
   return invoices;
 }
 
-// ─── UPDATE STATUS ──────────────────────────────────────────────────────────
+// ─── UPDATE LIFECYCLE STATUS FIELDS ────────────────────────────────────────
 
-export async function updateInvoiceStatus(
+export async function updateInvoicePdfStatus(
   invoiceId: string,
-  status: string,
-  extra?: { pdfUrl?: string; sentAt?: Date }
+  pdfStatus: InvoicePdfStatus,
+  extra?: { pdfUrl?: string }
 ): Promise<void> {
-  const setClauses = ['status = $2'];
-  const params: unknown[] = [invoiceId, status];
+  const setClauses = ['pdf_status = $2', 'status = $2'];
+  const params: unknown[] = [invoiceId, pdfStatus];
   let idx = 3;
 
   if (extra?.pdfUrl) {
@@ -185,16 +207,53 @@ export async function updateInvoiceStatus(
     params.push(extra.pdfUrl);
     idx++;
   }
+
+  await query(
+    `UPDATE invoices SET ${setClauses.join(', ')} WHERE id = $1`,
+    params
+  );
+}
+
+export async function updateInvoiceEmailStatus(
+  invoiceId: string,
+  emailStatus: EmailDeliveryStatus,
+  extra?: { sentAt?: Date }
+): Promise<void> {
+  const setClauses = ['email_status = $2'];
+  const params: unknown[] = [invoiceId, emailStatus];
+
   if (extra?.sentAt) {
-    setClauses.push(`sent_at = $${idx}`);
+    setClauses.push('sent_at = $3');
     params.push(extra.sentAt);
-    idx++;
   }
 
   await query(
     `UPDATE invoices SET ${setClauses.join(', ')} WHERE id = $1`,
     params
   );
+}
+
+export async function updateInvoicePaymentStatus(
+  invoiceId: string,
+  paymentStatus: Extract<PaymentStatus, 'unpaid' | 'paid'>
+): Promise<void> {
+  await query(
+    `UPDATE invoices SET payment_status = $2 WHERE id = $1`,
+    [invoiceId, paymentStatus]
+  );
+}
+
+/** @deprecated Use updateInvoicePdfStatus/updateInvoiceEmailStatus instead. */
+export async function updateInvoiceStatus(
+  invoiceId: string,
+  status: string,
+  extra?: { pdfUrl?: string; sentAt?: Date }
+): Promise<void> {
+  if (status === 'sent') {
+    await updateInvoiceEmailStatus(invoiceId, 'sent', { sentAt: extra?.sentAt });
+    return;
+  }
+  await updateInvoicePdfStatus(invoiceId, normalizePdfStatus(status), { pdfUrl: extra?.pdfUrl });
 }
 
 // ─── LOG EVENT ──────────────────────────────────────────────────────────────
