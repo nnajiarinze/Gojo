@@ -20,6 +20,13 @@ const PAYMENT_STATUS_LABELS: Record<string, { label: string; color: string; bg: 
   overdue:        { label: 'Overdue', color: '#B91C1C', bg: '#FEE2E2' },
 };
 
+const EMAIL_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  pending: { label: 'Email not sent', color: '#374151', bg: '#F3F4F6' },
+  sending: { label: 'Email sending', color: '#6D28D9', bg: '#EDE9FE' },
+  sent:    { label: 'Email sent',     color: '#065F46', bg: '#D1FAE5' },
+  failed:  { label: 'Email failed',   color: '#991B1B', bg: '#FEE2E2' },
+};
+
 export default function HistoryScreen() {
   const router = useRouter();
   const setInvoice = useReceiptStore((s) => s.setInvoice);
@@ -111,6 +118,7 @@ export default function HistoryScreen() {
       }
       renderItem={({ item }) => {
         const statusInfo = PAYMENT_STATUS_LABELS[item.paymentStatus] ?? PAYMENT_STATUS_LABELS.unpaid;
+        const emailInfo = EMAIL_STATUS_LABELS[item.emailStatus] ?? EMAIL_STATUS_LABELS.pending;
         return (
           <TouchableOpacity
             style={styles.card}
@@ -119,10 +127,17 @@ export default function HistoryScreen() {
           >
             <View style={styles.cardTop}>
               <Text style={styles.invoiceNumber}>{item.invoiceNumber}</Text>
-              <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                <Text style={[styles.statusText, { color: statusInfo.color }]}>
-                  {statusInfo.label}
-                </Text>
+              <View style={styles.badgeGroup}>
+                <View style={[styles.statusBadge, { backgroundColor: emailInfo.bg }]}> 
+                  <Text style={[styles.statusText, { color: emailInfo.color }]}> 
+                    {emailInfo.label}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}> 
+                  <Text style={[styles.statusText, { color: statusInfo.color }]}> 
+                    {statusInfo.label}
+                  </Text>
+                </View>
               </View>
             </View>
             <View style={styles.cardBottom}>
@@ -131,7 +146,7 @@ export default function HistoryScreen() {
                 {item.currency} {item.totalAmount.toFixed(2)}
               </Text>
             </View>
-            <Text style={styles.metaText}>Email: {item.emailStatus === 'sent' ? 'Sent' : 'Not sent'}</Text>
+            <Text style={styles.metaText}>Email status: {emailInfo.label}</Text>
           </TouchableOpacity>
         );
       }}
@@ -174,7 +189,7 @@ const styles = StyleSheet.create({
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
   },
   invoiceNumber: {
@@ -182,6 +197,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     fontFamily: 'monospace',
+  },
+  badgeGroup: {
+    alignItems: 'flex-end',
+    gap: 6,
+    maxWidth: '50%',
   },
   statusBadge: {
     paddingHorizontal: 10,

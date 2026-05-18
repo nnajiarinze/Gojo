@@ -131,6 +131,11 @@ export default function InvoiceScreen() {
             {invoice.paymentStatus === 'paid' ? 'Betald' : 'Obetald'}
           </Text>
         </View>
+        <View style={invoice.emailStatus === 'sent' ? styles.emailPillSent : styles.emailPillPending}>
+          <Text style={invoice.emailStatus === 'sent' ? styles.emailPillSentText : styles.emailPillPendingText}>
+            {invoice.emailStatus === 'sent' ? 'E-post skickad' : invoice.emailStatus === 'sending' ? 'E-post skickas' : invoice.emailStatus === 'failed' ? 'E-post misslyckades' : 'E-post ej skickad'}
+          </Text>
+        </View>
       </View>
 
       {/* Restaurant / Legal info */}
@@ -513,4 +518,8 @@ const styles = StyleSheet.create({
   paymentPillPaidText: { fontSize: 13, color: '#166534', fontWeight: '800' },
   paymentPillUnpaid: { backgroundColor: '#FEE2E2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 8 },
   paymentPillUnpaidText: { fontSize: 13, color: '#991B1B', fontWeight: '800' },
+  emailPillSent: { backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 8 },
+  emailPillSentText: { fontSize: 13, color: '#065F46', fontWeight: '800' },
+  emailPillPending: { backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 8 },
+  emailPillPendingText: { fontSize: 13, color: '#374151', fontWeight: '800' },
 });
