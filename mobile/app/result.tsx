@@ -29,6 +29,17 @@ interface EditableLineItem {
   unitPrice: string;
 }
 
+interface SubmitLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export default function ResultScreen() {
   const router = useRouter();
   const receipt = useReceiptStore((s) => s.receipt);
@@ -133,6 +144,37 @@ export default function ResultScreen() {
     return editItems.reduce((sum, item) => sum + computeTotal(item), 0);
   };
 
+  const buildSubmitLineItems = useCallback((): SubmitLineItem[] => {
+    const normalized: SubmitLineItem[] = [];
+
+    for (const item of editItems) {
+      const description = item.description.trim();
+      const quantity = parseFloat(item.quantity) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+      const total = computeTotal(item);
+      if (!description || quantity <= 0 || total === 0) continue;
+
+      if (total < 0) {
+        const previous = normalized[normalized.length - 1];
+        if (previous && previous.total + total > 0) {
+          previous.total = roundMoney(previous.total + total);
+          previous.unitPrice = roundMoney(previous.total / previous.quantity);
+          previous.description = `${previous.description} (incl. ${description})`;
+        }
+        continue;
+      }
+
+      normalized.push({
+        description,
+        quantity,
+        unitPrice: roundMoney(unitPrice),
+        total: roundMoney(total),
+      });
+    }
+
+    return normalized;
+  }, [editItems]);
+
   const handleSaveEdits = useCallback(async () => {
     if (!receipt) return;
     if (editItems.length === 0) {
@@ -149,12 +191,7 @@ export default function ResultScreen() {
     try {
       const updated = await updateReceipt(receipt.id, {
         merchantName: merchantName.trim(),
-        lineItems: editItems.map((item) => ({
-          description: item.description.trim(),
-          quantity: parseFloat(item.quantity) || 0,
-          unitPrice: parseFloat(item.unitPrice) || 0,
-          total: computeTotal(item),
-        })),
+        lineItems: buildSubmitLineItems(),
       });
       console.log(`[Result] Receipt saved & reviewed: ${updated.status}`);
       setReceipt(updated);
@@ -180,19 +217,14 @@ export default function ResultScreen() {
 
       // The backend has no line items (OCR worker stores empty data).
       // Push local parsed data to the backend so validation passes.
-      const lineItemsToSave = editItems.length > 0
-        ? editItems.map((item) => ({
-            description: item.description.trim(),
-            quantity: parseFloat(item.quantity) || 0,
-            unitPrice: parseFloat(item.unitPrice) || 0,
-            total: computeTotal(item),
-          }))
+        const lineItemsToSave = editItems.length > 0
+          ? buildSubmitLineItems()
         : (parsedReceipt?.lineItems ?? []).map((li: any) => ({
             description: li.description,
             quantity: li.quantity,
             unitPrice: li.unitPrice,
             total: li.total,
-          }));
+            })).filter((li: SubmitLineItem) => li.quantity > 0 && li.total > 0 && li.unitPrice >= 0);
 
       if (lineItemsToSave.length === 0) {
         Alert.alert('Inga rader', 'Kvittot har inga rader. Redigera och lägg till rader först.');
@@ -212,18 +244,13 @@ export default function ResultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [receipt]);
+  }, [receipt, editItems, buildSubmitLineItems, merchantName, parsedReceipt]);
 
   const handleGenerateInvoice = useCallback(async () => {
     if (!receipt) return;
 
     // ── Build final reviewed line items from editable state ──
-    const finalLineItems = editItems.map((item) => ({
-      description: item.description.trim(),
-      quantity: parseFloat(item.quantity) || 0,
-      unitPrice: parseFloat(item.unitPrice) || 0,
-      total: computeTotal(item),
-    }));
+    const finalLineItems = buildSubmitLineItems();
 
     // ── Validation: block if data looks like mock/seed ──
     const mockCustomerId = '00000000-0000-0000-0000-000000000001';
@@ -313,7 +340,7 @@ export default function ResultScreen() {
     } finally {
       setLoading(false);
     }
-  }, [receipt, editItems, merchantName, parsedReceipt]);
+  }, [receipt, editItems, merchantName, parsedReceipt, buildSubmitLineItems]);
 
   if (!receipt) {
     return (

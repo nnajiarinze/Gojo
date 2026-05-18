@@ -34,6 +34,7 @@ export default function RootLayout() {
         }} />
         <Stack.Screen name="invoice" options={{ title: 'Invoice' }} />
         <Stack.Screen name="history" options={{ title: 'Invoice History' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack>
     </QueryClientProvider>
   );

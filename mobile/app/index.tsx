@@ -6,6 +6,7 @@ import { useReceiptStore } from '../src/store/receiptStore';
 export default function HomeScreen() {
   const router = useRouter();
   const reset = useReceiptStore((s) => s.reset);
+  const parserMode = useReceiptStore((s) => s.parserMode);
 
   const handleScan = () => {
     reset();
@@ -18,6 +19,9 @@ export default function HomeScreen() {
         <Text style={styles.logo}>📄</Text>
         <Text style={styles.title}>Gojo</Text>
         <Text style={styles.subtitle}>Receipt → Invoice in seconds</Text>
+        <Text style={styles.parserBadge}>
+          Parser: {parserMode === 'gojo' ? 'Gojo demo parser' : 'Generic parser'}
+        </Text>
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleScan} activeOpacity={0.8}>
@@ -30,6 +34,14 @@ export default function HomeScreen() {
         activeOpacity={0.8}
       >
         <Text style={styles.historyBtnText}>Invoice History</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.settingsBtn}
+        onPress={() => router.push('/settings')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.settingsBtnText}>Settings</Text>
       </TouchableOpacity>
     </View>
   );
@@ -47,6 +59,16 @@ const styles = StyleSheet.create({
   logo: { fontSize: 64, marginBottom: 16 },
   title: { fontSize: 36, fontWeight: '800', color: '#111827' },
   subtitle: { fontSize: 16, color: '#6B7280', marginTop: 8 },
+  parserBadge: {
+    marginTop: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#EEF2FF',
+    color: '#3730A3',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   button: {
     backgroundColor: '#111827',
     paddingHorizontal: 48,
@@ -66,4 +88,13 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   historyBtnText: { color: '#374151', fontSize: 16, fontWeight: '600' },
+  settingsBtn: {
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  settingsBtnText: { color: '#6B7280', fontSize: 16, fontWeight: '600' },
 });

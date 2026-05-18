@@ -4,9 +4,11 @@ import type { OCRResult } from '../services/ocrService';
 import type { ParsedReceipt, ParseResult } from '../services/receiptParser';
 
 export type FlowStep = 'idle' | 'capturing' | 'uploading' | 'processing' | 'done' | 'error';
+export type ParserMode = 'gojo' | 'generic';
 
 interface ReceiptState {
   step: FlowStep;
+  parserMode: ParserMode;
   error: string | null;
   imageUri: string | null;
   receiptId: string | null;
@@ -25,6 +27,7 @@ interface ReceiptState {
   setLocalOcr: (result: OCRResult) => void;
   setParsedReceipt: (parsed: ParsedReceipt) => void;
   setParseResult: (result: ParseResult) => void;
+  setParserMode: (mode: ParserMode) => void;
   setStep: (step: FlowStep) => void;
   setError: (error: string) => void;
   reset: () => void;
@@ -32,6 +35,7 @@ interface ReceiptState {
 
 const initialState = {
   step: 'idle' as FlowStep,
+  parserMode: 'generic' as ParserMode,
   error: null as string | null,
   imageUri: null as string | null,
   receiptId: null as string | null,
@@ -46,7 +50,18 @@ const initialState = {
 export const useReceiptStore = create<ReceiptState>((set) => ({
   ...initialState,
 
-  setImageUri: (uri) => set({ imageUri: uri, step: 'capturing' }),
+  setImageUri: (uri) => set({
+    imageUri: uri,
+    step: 'capturing',
+    error: null,
+    receiptId: null,
+    receipt: null,
+    invoiceCreated: null,
+    invoice: null,
+    localOcr: null,
+    parsedReceipt: null,
+    parseResult: null,
+  }),
   setReceiptId: (id) => set({ receiptId: id }),
   // FIX: setReceipt MUST NOT change step. The old code set step='done' on
   // every call, which meant navigating back to the processing screen would
@@ -59,7 +74,8 @@ export const useReceiptStore = create<ReceiptState>((set) => ({
   setLocalOcr: (result) => set({ localOcr: result }),
   setParsedReceipt: (parsed) => set({ parsedReceipt: parsed }),
   setParseResult: (result) => set({ parseResult: result }),
+  setParserMode: (mode) => set({ parserMode: mode }),
   setStep: (step) => set({ step }),
   setError: (error) => set({ error, step: 'error' }),
-  reset: () => set(initialState),
+  reset: () => set((state) => ({ ...initialState, parserMode: state.parserMode })),
 }));
