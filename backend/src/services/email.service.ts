@@ -60,7 +60,7 @@ export async function sendInvoiceEmail(params: {
 
   const resend = new Resend(env.RESEND_API_KEY);
   const { data, error } = await resend.emails.send({
-    from: 'Gojo Faktura <gojo@arinzennaji.com>',
+    from: 'Gojo Faktura <gojo@tinkona.com>',
     to: [to],
     subject,
     text: body,
