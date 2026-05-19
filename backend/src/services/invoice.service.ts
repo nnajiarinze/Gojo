@@ -12,6 +12,7 @@ import { getInvoiceQueue } from '../queues/index.js';
 
 export async function createInvoice(params: {
   userId: string;
+  organizationId?: string;
   receiptId: string;
   customerId: string;
   dueDate: string;

@@ -1,6 +1,7 @@
 import { query, queryOne, pool } from '../config/database.js';
 import { EmailDeliveryStatus, Invoice, InvoicePdfStatus, LineItem, PaymentStatus } from '../types/domain.js';
 import { randomUUID } from 'node:crypto';
+import { getDefaultOrganizationIdForUser } from './organization.repository.js';
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ function rowToInvoice(row: any, lineItems: LineItem[]): Invoice {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id,
     receiptId: row.receipt_id,
     customerId: row.customer_id,
     invoiceNumber: row.invoice_number,
@@ -82,6 +84,7 @@ async function nextInvoiceNumber(): Promise<string> {
 
 export async function createInvoice(params: {
   userId: string;
+  organizationId?: string;
   receiptId: string;
   customerId: string;
   dueDate: string;
@@ -99,6 +102,12 @@ export async function createInvoice(params: {
 
     const invoiceId = randomUUID();
     const invoiceNumber = await nextInvoiceNumber();
+    const defaultOrganizationId = params.organizationId ?? await getDefaultOrganizationIdForUser(params.userId);
+    const receiptRow = await client.query<{ organization_id: string }>(
+      `SELECT organization_id FROM receipts WHERE id = $1`,
+      [params.receiptId]
+    );
+    const organizationId = receiptRow.rows[0]?.organization_id ?? defaultOrganizationId;
 
     // Use actual parsed receipt values (Netto, Moms, Totalt) when provided.
     // These come directly from the scanned receipt text and are the source of truth.
@@ -118,12 +127,12 @@ export async function createInvoice(params: {
     // Invoice is immutable after creation — it snapshots receipt data
     // at this point and is never affected by future receipt edits.
     await client.query(
-      `INSERT INTO invoices (id, user_id, receipt_id, customer_id, invoice_number,
+      `INSERT INTO invoices (id, user_id, organization_id, receipt_id, customer_id, invoice_number,
          issue_date, due_date, subtotal, tax_rate, tax_amount, total_amount,
          currency, notes, status, pdf_status, email_status, payment_status, legal_metadata)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, $6, $7, $8, $9, $10, 'SEK', $11, 'generating_pdf', 'generating_pdf', 'pending', 'unpaid', $12)`,
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, $7, $8, $9, $10, $11, 'SEK', $12, 'generating_pdf', 'generating_pdf', 'pending', 'unpaid', $13)`,
       [
-        invoiceId, params.userId, params.receiptId, params.customerId,
+        invoiceId, params.userId, organizationId, params.receiptId, params.customerId,
         invoiceNumber, params.dueDate, subtotal, params.taxRate,
         taxAmount, totalAmount, params.notes ?? null,
         params.legalMetadata ? JSON.stringify(params.legalMetadata) : null,
@@ -159,7 +168,10 @@ export async function getInvoiceById(
   // Invoice retrieval is independent of receipt state.
   // The invoice is a self-contained, immutable record.
   const row = await queryOne<any>(
-    `SELECT * FROM invoices WHERE id = $1 AND user_id = $2`,
+    `SELECT i.*
+     FROM invoices i
+     JOIN organization_members om ON om.organization_id = i.organization_id
+     WHERE i.id = $1 AND om.user_id = $2`,
     [invoiceId, userId]
   );
   if (!row) return null;
@@ -176,7 +188,11 @@ export async function getInvoiceById(
 
 export async function listInvoicesByUser(userId: string): Promise<Invoice[]> {
   const rows = await query<any>(
-    `SELECT * FROM invoices WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT i.*
+     FROM invoices i
+     JOIN organization_members om ON om.organization_id = i.organization_id
+     WHERE om.user_id = $1
+     ORDER BY i.created_at DESC`,
     [userId]
   );
 

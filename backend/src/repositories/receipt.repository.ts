@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { query, queryOne, pool } from '../config/database.js';
 import { Receipt, LineItem, ReceiptStatus } from '../types/domain.js';
+import { getDefaultOrganizationIdForUser } from './organization.repository.js';
 
 // ─── Row types (snake_case from Postgres) ───
 
 interface ReceiptRow {
   id: string;
   user_id: string;
+  organization_id: string;
   image_url: string;
   image_key: string;
   merchant_name: string | null;
@@ -40,6 +42,7 @@ function toReceipt(row: ReceiptRow, lineItems: LineItem[]): Receipt {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id,
     imageUrl: row.image_url,
     imageKey: row.image_key,
     merchantName: row.merchant_name,
@@ -79,10 +82,11 @@ export async function createReceipt(
   imageKey: string
 ): Promise<string> {
   const id = randomUUID();
+  const organizationId = await getDefaultOrganizationIdForUser(userId);
   await query(
-    `INSERT INTO receipts (id, user_id, image_url, image_key, status)
-     VALUES ($1, $2, $3, $4, 'uploaded')`,
-    [id, userId, imageUrl, imageKey]
+    `INSERT INTO receipts (id, user_id, organization_id, image_url, image_key, status)
+     VALUES ($1, $2, $3, $4, $5, 'uploaded')`,
+    [id, userId, organizationId, imageUrl, imageKey]
   );
   return id;
 }

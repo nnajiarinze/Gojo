@@ -2,7 +2,18 @@ export type ReceiptStatus = 'uploaded' | 'processing' | 'extracted' | 'reviewed'
 export type InvoicePdfStatus = 'draft' | 'generating_pdf' | 'ready' | 'failed';
 export type EmailDeliveryStatus = 'pending' | 'sending' | 'sent' | 'failed';
 export type PaymentStatus = 'unpaid' | 'paid' | 'partially_paid' | 'overdue';
+export type OrganizationMemberRole = 'owner' | 'admin' | 'staff';
 export type EventType = 'created' | 'ocr_started' | 'ocr_completed' | 'ocr_failed' | 'pdf_started' | 'pdf_completed' | 'pdf_failed' | 'email_sent' | 'email_failed' | 'state_changed' | 'invoice_created' | 'invoice_failed';
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  orgNumber: string | null;
+  address: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface User {
   id: string;
@@ -16,6 +27,7 @@ export interface User {
 export interface Receipt {
   id: string;
   userId: string;
+  organizationId: string;
   imageUrl: string;
   imageKey: string;
   merchantName: string | null;
@@ -47,6 +59,7 @@ export interface LineItem {
 export interface Customer {
   id: string;
   userId: string;
+  organizationId: string;
   name: string;
   email: string;
   company: string | null;
@@ -66,6 +79,7 @@ export interface InvoiceLegalMetadata {
 export interface Invoice {
   id: string;
   userId: string;
+  organizationId: string;
   receiptId: string;
   customerId: string;
   invoiceNumber: string;

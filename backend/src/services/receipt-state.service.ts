@@ -187,6 +187,7 @@ export class ReceiptStateService {
     return {
       id: row.id,
       userId: row.user_id,
+      organizationId: row.organization_id,
       imageUrl: row.image_url,
       imageKey: row.image_key,
       merchantName: row.merchant_name,

@@ -7,6 +7,7 @@ import { globalErrorHandler } from './middleware/error-handler.js';
 import { receiptRoutes } from './routes/receipt.routes.js';
 import { invoiceRoutes } from './routes/invoice.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
+import { ensureDefaultOrganizationForUser } from './repositories/organization.repository.js';
 
 const app = Fastify({
   logger: {
@@ -32,11 +33,13 @@ app.register(invoiceRoutes, { prefix: '/api/v1' });
 app.register(adminRoutes, { prefix: '/admin' });
 
 async function seedStubUser(): Promise<void> {
+  const stubUserId = '00000000-0000-0000-0000-000000000001';
   await query(
     `INSERT INTO users (id, email, name, clerk_id)
      VALUES ('00000000-0000-0000-0000-000000000001', 'stub@gojo.dev', 'Stub User', 'clerk-stub')
      ON CONFLICT (id) DO NOTHING`
   );
+  await ensureDefaultOrganizationForUser(stubUserId);
   console.log('[Seed] Stub user ensured');
 }
 

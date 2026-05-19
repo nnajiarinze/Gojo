@@ -25,6 +25,9 @@ function parseInvoiceRow(row: any) {
   return {
     id: row.id,
     userId: row.user_id,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name ?? null,
+    organizationSlug: row.organization_slug ?? null,
     receiptId: row.receipt_id,
     customerId: row.customer_id,
     invoiceNumber: row.invoice_number,
@@ -72,19 +75,51 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.type('text/html').send(ADMIN_HTML);
   });
 
+  // ── List organizations for super-admin filtering ──────────────────────
+  app.get('/organizations', { ...guardedRoute }, async (_request, reply) => {
+    const organizations = await query<any>(
+      `SELECT id, name, slug, org_number, address, created_at, updated_at
+       FROM organizations
+       ORDER BY name ASC`
+    );
+
+    return reply.send({
+      organizations: organizations.map((org: any) => ({
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        orgNumber: org.org_number,
+        address: org.address,
+        createdAt: org.created_at,
+        updatedAt: org.updated_at,
+      })),
+    });
+  });
+
   // ── List invoices (paginated) ───────────────────────────────────────────
   app.get('/invoices', { ...guardedRoute }, async (request, reply) => {
-    const { page = '1', limit = '20' } = request.query as any;
+    const { page = '1', limit = '20', organizationId } = request.query as any;
     const p = Math.max(1, parseInt(page, 10) || 1);
     const l = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
     const offset = (p - 1) * l;
+    const filterByOrganization = typeof organizationId === 'string' && organizationId !== '' && organizationId !== 'all';
 
-    const countRow = await queryOne<{ cnt: string }>('SELECT COUNT(*)::text AS cnt FROM invoices');
+    const countRow = await queryOne<{ cnt: string }>(
+      `SELECT COUNT(*)::text AS cnt
+       FROM invoices i
+       ${filterByOrganization ? 'WHERE i.organization_id = $1' : ''}`,
+      filterByOrganization ? [organizationId] : []
+    );
     const total = parseInt(countRow?.cnt ?? '0', 10);
 
     const rows = await query<any>(
-      'SELECT * FROM invoices ORDER BY created_at DESC LIMIT $1 OFFSET $2',
-      [l, offset]
+      `SELECT i.*, o.name AS organization_name, o.slug AS organization_slug
+       FROM invoices i
+       LEFT JOIN organizations o ON o.id = i.organization_id
+       ${filterByOrganization ? 'WHERE i.organization_id = $1' : ''}
+       ORDER BY i.created_at DESC
+       LIMIT $${filterByOrganization ? 2 : 1} OFFSET $${filterByOrganization ? 3 : 2}`,
+      filterByOrganization ? [organizationId, l, offset] : [l, offset]
     );
 
     const invoices = rows.map(parseInvoiceRow);
@@ -102,14 +137,20 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       }));
     }
 
-    return reply.send({ invoices, page: p, limit: l, total, totalPages: Math.ceil(total / l) });
+    return reply.send({ invoices, page: p, limit: l, total, totalPages: Math.ceil(total / l), organizationId: filterByOrganization ? organizationId : 'all' });
   });
 
   // ── Get single invoice detail ───────────────────────────────────────────
   app.get('/invoices/:id', { ...guardedRoute }, async (request, reply) => {
     const { id } = request.params as any;
 
-    const row = await queryOne<any>('SELECT * FROM invoices WHERE id = $1', [id]);
+    const row = await queryOne<any>(
+      `SELECT i.*, o.name AS organization_name, o.slug AS organization_slug
+       FROM invoices i
+       LEFT JOIN organizations o ON o.id = i.organization_id
+       WHERE i.id = $1`,
+      [id]
+    );
     if (!row) return reply.code(404).send({ error: 'Invoice not found' });
 
     const invoice = parseInvoiceRow(row);
@@ -275,6 +316,9 @@ const ADMIN_HTML = `<!DOCTYPE html>
   .loading { text-align: center; padding: 40px; color: #888; }
   .error { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
   .pagination { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 16px; font-size: 13px; }
+  .toolbar { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar label { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #666; margin-right: 6px; }
+  .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; min-width: 220px; }
 </style>
 </head>
 <body>
@@ -298,6 +342,8 @@ let TOKEN = localStorage.getItem('gojo_admin_token') || '';
 let currentView = 'list';
 let currentId = null;
 let listData = { invoices: [], page: 1, total: 0, totalPages: 0 };
+let organizations = [];
+let selectedOrganizationId = localStorage.getItem('gojo_admin_organization_id') || 'all';
 
 function saveToken() {
   TOKEN = document.getElementById('token-input').value.trim();
@@ -345,12 +391,34 @@ function paymentControl(inv) {
   return statusBadge(inv.paymentStatus) + ' <button class="btn btn-sm btn-muted" onclick="event.stopPropagation(); updatePaymentStatus(&apos;' + inv.id + '&apos;, &apos;' + next + '&apos;)">' + label + '</button>';
 }
 
+async function loadOrganizations() {
+  const data = await api('/organizations');
+  organizations = data.organizations || [];
+}
+
+function organizationFilterHtml() {
+  let html = '<div><label for="org-filter">Organization</label><select id="org-filter" onchange="setOrganizationFilter(this.value)">';
+  html += '<option value="all"' + (selectedOrganizationId === 'all' ? ' selected' : '') + '>All organizations</option>';
+  for (const org of organizations) {
+    html += '<option value="' + org.id + '"' + (selectedOrganizationId === org.id ? ' selected' : '') + '>' + org.name + '</option>';
+  }
+  html += '</select></div>';
+  return html;
+}
+
+function setOrganizationFilter(organizationId) {
+  selectedOrganizationId = organizationId || 'all';
+  localStorage.setItem('gojo_admin_organization_id', selectedOrganizationId);
+  loadList(1);
+}
+
 // ── List view ─────────────────────────────────────────────────────────────
 async function loadList(page = 1) {
   const app = document.getElementById('app');
   app.innerHTML = '<div class="loading">Loading invoices...</div>';
   try {
-    listData = await api('/invoices?page=' + page + '&limit=20');
+    if (!organizations.length) await loadOrganizations();
+    listData = await api('/invoices?page=' + page + '&limit=20&organizationId=' + encodeURIComponent(selectedOrganizationId));
     renderList();
   } catch (e) {
     app.innerHTML = '<div class="error">' + e.message + '</div>';
@@ -360,15 +428,17 @@ async function loadList(page = 1) {
 function renderList() {
   const { invoices, page, total, totalPages } = listData;
   const app = document.getElementById('app');
-  if (!invoices.length) { app.innerHTML = '<div class="empty">No invoices found</div>'; return; }
+  const toolbar = '<div class="toolbar"><h2>Invoices (' + total + ')</h2>' + organizationFilterHtml() + '</div>';
+  if (!invoices.length) { app.innerHTML = '<div class="card">' + toolbar + '<div class="empty">No invoices found</div></div>'; return; }
 
-  let html = '<div class="card"><h2>Invoices (' + total + ')</h2><table><thead><tr>'
-    + '<th>Invoice #</th><th>Customer</th><th>Total</th><th>Email Status</th><th>Payment Status</th>'
+  let html = '<div class="card">' + toolbar + '<table><thead><tr>'
+    + '<th>Invoice #</th><th>Organization</th><th>Customer</th><th>Total</th><th>Email Status</th><th>Payment Status</th>'
     + '</tr></thead><tbody>';
 
   for (const inv of invoices) {
     html += '<tr onclick="loadDetail(&apos;' + inv.id + '&apos;)">'
       + '<td>' + inv.invoiceNumber + '</td>'
+      + '<td>' + (inv.organizationName || '—') + '</td>'
       + '<td>' + ((inv.legalMetadata && inv.legalMetadata.companyName) || 'Gojo') + '</td>'
       + '<td class="amount">' + formatAmount(inv.totalAmount) + ' ' + (inv.currency||'SEK') + '</td>'
       + '<td>' + statusBadge(inv.emailStatus) + '</td>'
@@ -404,13 +474,14 @@ async function loadDetail(id) {
 
 function renderDetail(inv) {
   const app = document.getElementById('app');
-  let html = '<a class="back-link" href="#" onclick="loadList();return false">← Back to list</a>';
+  let html = '<a class="back-link" href="#" onclick="loadList(listData.page || 1);return false">← Back to list</a>';
 
   // Metadata
   html += '<div class="card"><h2>' + inv.invoiceNumber + '</h2><div class="meta-grid">'
     + mi('PDF Status', statusBadge(inv.pdfStatus))
     + mi('Email Status', statusBadge(inv.emailStatus))
     + mi('Payment Status', paymentControl(inv))
+    + mi('Organization', inv.organizationName || inv.organizationId || '—')
     + mi('Issue Date', formatDate(inv.issueDate))
     + mi('Due Date', formatDate(inv.dueDate))
     + mi('Currency', inv.currency || 'SEK')
