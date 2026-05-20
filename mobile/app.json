@@ -21,6 +21,13 @@
           "photosPermission": "Gojo needs photo library access so you can choose receipt images."
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Gojo uses photo library access to show your latest receipt image thumbnail.",
+          "savePhotosPermission": "Gojo does not save photos to your library."
+        }
+      ],
       "expo-router",
       "expo-asset"
     ],

@@ -55,6 +55,8 @@
 	<string>Gojo needs camera access to scan receipts.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Gojo needs photo library access so you can choose receipt images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Gojo does not save photos to your library.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
 	<key>NSUserActivityTypes</key>

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
 import { ErrorState } from '../src/components/ErrorState';
-import { getReceiptImage, ReceiptImagePermissionError, ReceiptImageValidationError } from '../src/services/receiptImage';
+import { getReceiptImage, loadLatestPhotoThumbnail, ReceiptImagePermissionError, ReceiptImageValidationError } from '../src/services/receiptImage';
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -22,13 +22,23 @@ export default function CameraScreen() {
   const [photo, setPhoto] = useState<{ uri: string; width?: number; height?: number } | null>(null);
   const [continuing, setContinuing] = useState(false);
   const [choosingGallery, setChoosingGallery] = useState(false);
+  const [latestThumbnailUri, setLatestThumbnailUri] = useState<string | null>(null);
   const setReceiptImage = useReceiptStore((s) => s.setReceiptImage);
+
+  useEffect(() => {
+    let mounted = true;
+    loadLatestPhotoThumbnail().then((uri) => {
+      if (mounted) setLatestThumbnailUri(uri);
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const chooseFromGallery = async () => {
     setChoosingGallery(true);
     try {
       const image = await getReceiptImage({ source: 'gallery' });
       if (!image) return;
+      setLatestThumbnailUri(image.uri);
       setReceiptImage(image);
       router.push('/processing');
     } catch (err: any) {
@@ -127,6 +137,8 @@ export default function CameraScreen() {
             >
               {choosingGallery ? (
                 <ActivityIndicator color="#fff" size="small" />
+              ) : latestThumbnailUri ? (
+                <Image source={{ uri: latestThumbnailUri }} style={styles.galleryThumbnail} resizeMode="cover" />
               ) : (
                 <Text style={styles.galleryIcon}>▧</Text>
               )}
@@ -189,6 +201,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   galleryIcon: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  galleryThumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 13,
+  },
   captureSideSpacer: { width: 52, height: 52 },
   disabled: { opacity: 0.65 },
   captureBtn: {

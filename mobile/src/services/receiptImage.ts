@@ -1,5 +1,6 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 
 export type ReceiptImageSource = 'camera' | 'gallery';
 
@@ -35,6 +36,23 @@ const REJECTED_EXTENSIONS = new Set(['pdf', 'txt', 'doc', 'docx', 'heif-sequence
 
 export class ReceiptImagePermissionError extends Error {}
 export class ReceiptImageValidationError extends Error {}
+
+export async function loadLatestPhotoThumbnail(): Promise<string | null> {
+  const permission = await MediaLibrary.getPermissionsAsync();
+  if (!permission.granted) return null;
+
+  try {
+    const result = await MediaLibrary.getAssetsAsync({
+      first: 1,
+      mediaType: MediaLibrary.MediaType.photo,
+      sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+    });
+    return result.assets[0]?.uri ?? null;
+  } catch (err: any) {
+    console.warn('[ReceiptImage] Could not load latest thumbnail:', err?.message ?? err);
+    return null;
+  }
+}
 
 export async function getReceiptImage(input: CameraInput | GalleryInput): Promise<ReceiptImage | null> {
   if (input.source === 'camera') {
