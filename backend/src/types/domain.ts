@@ -93,6 +93,7 @@ export interface Invoice {
   currency: string;
   notes: string | null;
   pdfUrl: string | null;
+  pdfGeneratedAt: Date | null;
   pdfStatus: InvoicePdfStatus;
   emailStatus: EmailDeliveryStatus;
   paymentStatus: PaymentStatus;

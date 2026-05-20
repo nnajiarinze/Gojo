@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { redis } from '../config/redis.js';
 import { JobNames, InvoiceJobPayload } from '../types/jobs.js';
-import { generateAndStoreInvoicePdf, markInvoicePdfFailed } from '../services/invoice-pdf.service.js';
+import { generateAndStoreInvoicePdf, InvoicePdfImmutableError, markInvoicePdfFailed } from '../services/invoice-pdf.service.js';
 
 const worker = new Worker<InvoiceJobPayload>(
   JobNames.INVOICE_JOB,
@@ -17,6 +17,7 @@ const worker = new Worker<InvoiceJobPayload>(
 
 worker.on('failed', (job, err) => {
   console.error(`[Invoice Worker] Job ${job?.id} FAILED:`, err.message);
+  if (err instanceof InvoicePdfImmutableError) return;
   if (job?.data?.invoiceId) {
     markInvoicePdfFailed(job.data.invoiceId, err).catch(() => {});
   }

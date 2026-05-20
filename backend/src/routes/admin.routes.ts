@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { env } from '../config/env.js';
 import { query, queryOne } from '../config/database.js';
 import * as emailService from '../services/email.service.js';
-import { generateAndStoreInvoicePdf } from '../services/invoice-pdf.service.js';
+import { generateAndStoreInvoicePdf, InvoicePdfImmutableError } from '../services/invoice-pdf.service.js';
 
 type AdminPaymentStatus = 'unpaid' | 'paid';
 
@@ -41,6 +41,7 @@ function parseInvoiceRow(row: any) {
     currency: row.currency?.trim() ?? 'SEK',
     notes: row.notes,
     pdfUrl: row.pdf_url,
+    pdfGeneratedAt: row.pdf_generated_at ?? null,
     pdfStatus,
     emailStatus,
     paymentStatus,
@@ -257,12 +258,19 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(parseInvoiceRow(updated));
   });
 
-  // ── Regenerate PDF for stuck/failed invoices ──────────────────────────
-  app.post('/invoices/:id/regenerate-pdf', { ...guardedRoute }, async (request, reply) => {
+  // ── Legacy PDF repair endpoint. Body is not accepted or required. ──────
+  app.post('/invoices/:id/regenerate-pdf', {
+    ...guardedRoute,
+    schema: { body: false },
+  }, async (request, reply) => {
     const { id } = request.params as any;
 
     const row = await queryOne<any>('SELECT * FROM invoices WHERE id = $1', [id]);
     if (!row) return reply.code(404).send({ error: 'Invoice not found' });
+
+    if (row.pdf_url || row.pdf_generated_at || normalizePdfStatus(row.pdf_status ?? row.status) === 'ready') {
+      return reply.code(409).send({ error: 'Invoice PDFs are immutable' });
+    }
 
     try {
       const pdfUrl = await generateAndStoreInvoicePdf(id, row.user_id);
@@ -275,6 +283,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       );
       return reply.send({ ...parseInvoiceRow(updated), pdfUrl });
     } catch (err: any) {
+      if (err instanceof InvoicePdfImmutableError) {
+        return reply.code(409).send({ error: 'Invoice PDFs are immutable' });
+      }
       return reply.code(500).send({ error: err.message ?? 'Failed to regenerate PDF' });
     }
   });
@@ -378,9 +389,11 @@ function saveToken() {
 document.getElementById('token-input').value = TOKEN;
 
 async function api(path, opts = {}) {
+  const headers = { 'x-admin-token': TOKEN, ...(opts.headers || {}) };
+  if (opts.body != null && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
   const res = await fetch(BASE + '/admin' + path, {
     ...opts,
-    headers: { 'x-admin-token': TOKEN, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -534,8 +547,9 @@ function renderDetail(inv) {
 
   // PDF
   html += '<div class="card"><h2>PDF</h2>';
-  html += '<button class="btn btn-sm btn-muted" style="margin-bottom:8px" onclick="regeneratePdf(&apos;' + inv.id + '&apos;)">Regenerate PDF</button><div id="pdf-regenerate-status" style="margin-bottom:8px;font-size:13px"></div>';
   if (inv.pdfUrl) {
+    html += '<div style="display:flex;gap:8px;margin-bottom:8px"><a class="btn btn-sm btn-primary" href="' + inv.pdfUrl + '" target="_blank" rel="noopener">View PDF</a><a class="btn btn-sm btn-muted" href="' + inv.pdfUrl + '" download>Download PDF</a></div>';
+    if (inv.pdfGeneratedAt) html += '<p style="color:#666;margin-bottom:8px;font-size:13px">Generated ' + new Date(inv.pdfGeneratedAt).toLocaleString('sv-SE') + '</p>';
     html += '<p style="margin-bottom:8px"><a href="' + inv.pdfUrl + '" target="_blank" style="color:#0066cc">' + inv.pdfUrl + '</a></p>';
     html += '<iframe src="' + inv.pdfUrl + '" style="width:100%;height:500px;border:1px solid #e0e0e0;border-radius:4px" title="PDF preview"></iframe>';
   } else {
@@ -610,18 +624,6 @@ async function updatePaymentStatus(id, paymentStatus) {
     else loadList(listData.page || 1);
   } catch (e) {
     alert(e.message || 'Failed to update payment status');
-  }
-}
-
-async function regeneratePdf(id) {
-  const status = document.getElementById('pdf-regenerate-status');
-  if (status) status.textContent = 'Regenerating PDF...';
-  try {
-    await api('/invoices/' + id + '/regenerate-pdf', { method: 'POST' });
-    if (status) status.innerHTML = '<span style="color:#155724">✓ PDF regenerated</span>';
-    loadDetail(id);
-  } catch (e) {
-    if (status) status.innerHTML = '<span style="color:#dc3545">✗ ' + e.message + '</span>';
   }
 }
 

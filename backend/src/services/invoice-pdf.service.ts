@@ -3,12 +3,21 @@ import { uploadPdf } from '../config/storage.js';
 import * as invoiceRepo from '../repositories/invoice.repository.js';
 import { generateInvoicePdf } from './pdf.service.js';
 
+export class InvoicePdfImmutableError extends Error {
+  constructor() {
+    super('Invoice PDFs are immutable');
+  }
+}
+
 export async function generateAndStoreInvoicePdf(invoiceId: string, userId: string): Promise<string> {
   console.log(`[Invoice PDF] ═══ STARTED ═══ invoice=${invoiceId}`);
-  await invoiceRepo.logInvoiceEvent(invoiceId, 'pdf_started');
-
   const invoice = await invoiceRepo.getInvoiceById(invoiceId, userId);
   if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
+  if (invoice.pdfUrl || invoice.pdfGeneratedAt || invoice.pdfStatus === 'ready') {
+    throw new InvoicePdfImmutableError();
+  }
+
+  await invoiceRepo.logInvoiceEvent(invoiceId, 'pdf_started');
   console.log(`[Invoice PDF] Invoice loaded: ${invoice.invoiceNumber}, ${invoice.lineItems.length} items`);
 
   const pdfBuffer = generateInvoicePdf(invoice);

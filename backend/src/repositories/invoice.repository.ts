@@ -30,6 +30,7 @@ function rowToInvoice(row: any, lineItems: LineItem[]): Invoice {
     currency: row.currency?.trim() ?? 'SEK',
     notes: row.notes,
     pdfUrl: row.pdf_url,
+    pdfGeneratedAt: row.pdf_generated_at ?? null,
     pdfStatus,
     emailStatus,
     paymentStatus,
@@ -221,6 +222,10 @@ export async function updateInvoicePdfStatus(
   if (extra?.pdfUrl) {
     setClauses.push(`pdf_url = $${idx}`);
     params.push(extra.pdfUrl);
+    idx++;
+
+    setClauses.push(`pdf_generated_at = COALESCE(pdf_generated_at, $${idx})`);
+    params.push(new Date());
     idx++;
   }
 
