@@ -6,18 +6,21 @@ import {
   TouchableOpacity,
   Image,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
 import { ErrorState } from '../src/components/ErrorState';
+import { getReceiptImage } from '../src/services/receiptImage';
 
 export default function CameraScreen() {
   const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const setImageUri = useReceiptStore((s) => s.setImageUri);
+  const [photo, setPhoto] = useState<{ uri: string; width?: number; height?: number } | null>(null);
+  const [continuing, setContinuing] = useState(false);
+  const setReceiptImage = useReceiptStore((s) => s.setReceiptImage);
 
   // Permission not yet determined
   if (!permission) {
@@ -37,21 +40,38 @@ export default function CameraScreen() {
   }
 
   // Photo preview mode
-  if (photoUri) {
+  if (photo) {
     return (
       <SafeAreaView style={styles.container}>
-        <Image source={{ uri: photoUri }} style={styles.preview} resizeMode="contain" />
+        <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" />
         <View style={styles.previewActions}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.retakeBtn]}
-            onPress={() => setPhotoUri(null)}
+            onPress={() => setPhoto(null)}
+            disabled={continuing}
           >
             <Text style={styles.retakeText}>Retake</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.continueBtn]}
-            onPress={() => {
-              setImageUri(photoUri);
+            disabled={continuing}
+            onPress={async () => {
+              setContinuing(true);
+              try {
+                const image = await getReceiptImage({
+                  source: 'camera',
+                  uri: photo.uri,
+                  width: photo.width,
+                  height: photo.height,
+                });
+                if (!image) return;
+                setReceiptImage(image);
+              } catch (err: any) {
+                Alert.alert('Could Not Use Photo', err?.message ?? 'Please retake the photo.');
+                return;
+              } finally {
+                setContinuing(false);
+              }
               // Push: keep camera in the back stack so user can press back
               // from Result to retake the photo. Processing is transient and
               // will replace itself with Result, giving stack:
@@ -59,7 +79,7 @@ export default function CameraScreen() {
               router.push('/processing');
             }}
           >
-            <Text style={styles.continueText}>Continue</Text>
+            <Text style={styles.continueText}>{continuing ? 'Preparing…' : 'Continue'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -83,7 +103,7 @@ export default function CameraScreen() {
                   const photo = await cameraRef.current?.takePictureAsync({
                     quality: 0.8,
                   });
-                  if (photo?.uri) setPhotoUri(photo.uri);
+                  if (photo?.uri) setPhoto({ uri: photo.uri, width: photo.width, height: photo.height });
                 } catch (e: any) {
                   // Camera unmounted during capture — safe to ignore
                   console.log('[Camera] Capture dismissed:', e.message);

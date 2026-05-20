@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -39,9 +39,39 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1DD6871E2FB8E67C00E9316D /* com.ari.gojo */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = com.ari.gojo; sourceTree = "<group>"; };
-		1DD6872C2FB8E67D00E9316D /* com.ari.gojoTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = com.ari.gojoTests; sourceTree = "<group>"; };
-		1DD687362FB8E67D00E9316D /* com.ari.gojoUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = com.ari.gojoUITests; sourceTree = "<group>"; };
+		1DD6871E2FB8E67C00E9316D /* com.ari.gojo */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = com.ari.gojo;
+			sourceTree = "<group>";
+		};
+		1DD6872C2FB8E67D00E9316D /* com.ari.gojoTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = com.ari.gojoTests;
+			sourceTree = "<group>";
+		};
+		1DD687362FB8E67D00E9316D /* com.ari.gojoUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = com.ari.gojoUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */

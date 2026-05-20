@@ -1,16 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Alert, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
+import { getReceiptImage, ReceiptImagePermissionError, ReceiptImageValidationError } from '../src/services/receiptImage';
 
 export default function HomeScreen() {
   const router = useRouter();
   const reset = useReceiptStore((s) => s.reset);
   const parserMode = useReceiptStore((s) => s.parserMode);
+  const setReceiptImage = useReceiptStore((s) => s.setReceiptImage);
+  const [choosingGallery, setChoosingGallery] = useState(false);
 
   const handleScan = () => {
     reset();
     router.push('/camera');
+  };
+
+  const handleChooseGallery = async () => {
+    setChoosingGallery(true);
+    try {
+      const image = await getReceiptImage({ source: 'gallery' });
+      if (!image) return;
+      reset();
+      setReceiptImage(image);
+      router.push('/processing');
+    } catch (err: any) {
+      const title = err instanceof ReceiptImagePermissionError
+        ? 'Photo Access Needed'
+        : err instanceof ReceiptImageValidationError
+          ? 'Unsupported Image'
+          : 'Could Not Choose Image';
+      Alert.alert(title, err?.message ?? 'Please try another image.');
+    } finally {
+      setChoosingGallery(false);
+    }
   };
 
   return (
@@ -25,7 +48,20 @@ export default function HomeScreen() {
       </View>
 
       <TouchableOpacity style={styles.button} onPress={handleScan} activeOpacity={0.8}>
-        <Text style={styles.buttonText}>Scan Receipt</Text>
+        <Text style={styles.buttonText}>Take Photo</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.galleryBtn, choosingGallery && styles.disabledBtn]}
+        onPress={handleChooseGallery}
+        activeOpacity={0.8}
+        disabled={choosingGallery}
+      >
+        {choosingGallery ? (
+          <ActivityIndicator color="#111827" />
+        ) : (
+          <Text style={styles.galleryBtnText}>Choose from Gallery</Text>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -78,6 +114,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  galleryBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  galleryBtnText: { color: '#111827', fontSize: 16, fontWeight: '700' },
+  disabledBtn: { opacity: 0.65 },
   historyBtn: {
     backgroundColor: '#F3F4F6',
     paddingHorizontal: 48,
