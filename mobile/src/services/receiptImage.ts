@@ -31,6 +31,7 @@ type RawReceiptImage = {
 const MAX_DIMENSION = 2000;
 const ACCEPTED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png']);
 const ACCEPTED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png']);
+const REJECTED_EXTENSIONS = new Set(['pdf', 'txt', 'doc', 'docx', 'heif-sequence', 'mov', 'mp4']);
 
 export class ReceiptImagePermissionError extends Error {}
 export class ReceiptImageValidationError extends Error {}
@@ -75,11 +76,19 @@ export async function getReceiptImage(input: CameraInput | GalleryInput): Promis
 function validateImageType(uri: string, mimeType?: string | null, fileName?: string | null) {
   const normalizedMimeType = mimeType?.toLowerCase();
   if (normalizedMimeType && ACCEPTED_MIME_TYPES.has(normalizedMimeType)) return;
+  if (normalizedMimeType && !normalizedMimeType.startsWith('image/')) {
+    throw new ReceiptImageValidationError('Choose an image file from your photo library.');
+  }
 
   const extension = getExtension(fileName) ?? getExtension(uri);
   if (extension && ACCEPTED_EXTENSIONS.has(extension)) return;
+  if (extension && REJECTED_EXTENSIONS.has(extension)) {
+    throw new ReceiptImageValidationError('Choose an image file from your photo library.');
+  }
 
-  throw new ReceiptImageValidationError('Choose a JPG, JPEG, or PNG receipt image.');
+  // iOS often returns photo-library assets without a filename extension, or as
+  // HEIC/HEIF camera-roll images. The picker is already restricted to images,
+  // and normalizeReceiptImage converts supported image assets to JPEG.
 }
 
 async function normalizeReceiptImage(image: RawReceiptImage): Promise<ReceiptImage> {
