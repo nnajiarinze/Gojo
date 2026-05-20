@@ -7,12 +7,13 @@ import {
   Image,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useReceiptStore } from '../src/store/receiptStore';
 import { ErrorState } from '../src/components/ErrorState';
-import { getReceiptImage } from '../src/services/receiptImage';
+import { getReceiptImage, ReceiptImagePermissionError, ReceiptImageValidationError } from '../src/services/receiptImage';
 
 export default function CameraScreen() {
   const router = useRouter();
@@ -20,7 +21,27 @@ export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [photo, setPhoto] = useState<{ uri: string; width?: number; height?: number } | null>(null);
   const [continuing, setContinuing] = useState(false);
+  const [choosingGallery, setChoosingGallery] = useState(false);
   const setReceiptImage = useReceiptStore((s) => s.setReceiptImage);
+
+  const chooseFromGallery = async () => {
+    setChoosingGallery(true);
+    try {
+      const image = await getReceiptImage({ source: 'gallery' });
+      if (!image) return;
+      setReceiptImage(image);
+      router.push('/processing');
+    } catch (err: any) {
+      const title = err instanceof ReceiptImagePermissionError
+        ? 'Photo Access Needed'
+        : err instanceof ReceiptImageValidationError
+          ? 'Unsupported Image'
+          : 'Could Not Choose Image';
+      Alert.alert(title, err?.message ?? 'Please try another image.');
+    } finally {
+      setChoosingGallery(false);
+    }
+  };
 
   // Permission not yet determined
   if (!permission) {
@@ -97,6 +118,20 @@ export default function CameraScreen() {
 
           <View style={styles.captureRow}>
             <TouchableOpacity
+              style={[styles.galleryAffordance, choosingGallery && styles.disabled]}
+              onPress={chooseFromGallery}
+              disabled={choosingGallery}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Choose receipt image from gallery"
+            >
+              {choosingGallery ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.galleryIcon}>▧</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.captureBtn}
               onPress={async () => {
                 try {
@@ -112,6 +147,7 @@ export default function CameraScreen() {
             >
               <View style={styles.captureBtnInner} />
             </TouchableOpacity>
+            <View style={styles.captureSideSpacer} />
           </View>
         </SafeAreaView>
       </CameraView>
@@ -136,7 +172,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { color: '#fff', fontSize: 20, fontWeight: '600' },
-  captureRow: { alignItems: 'center', paddingBottom: 20 },
+  captureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 20,
+  },
+  galleryAffordance: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryIcon: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  captureSideSpacer: { width: 52, height: 52 },
+  disabled: { opacity: 0.65 },
   captureBtn: {
     width: 80,
     height: 80,
