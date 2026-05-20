@@ -214,7 +214,7 @@ export async function updateInvoicePdfStatus(
   pdfStatus: InvoicePdfStatus,
   extra?: { pdfUrl?: string }
 ): Promise<void> {
-  const setClauses = ['pdf_status = $2::invoice_pdf_status', 'status = $2::invoice_status'];
+  const setClauses = ['pdf_status = $2::text::invoice_pdf_status', 'status = $2::text::invoice_status'];
   const params: unknown[] = [invoiceId, pdfStatus];
   let idx = 3;
 
