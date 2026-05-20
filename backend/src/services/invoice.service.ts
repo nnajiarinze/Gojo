@@ -1,6 +1,7 @@
 import { Invoice, LineItem } from '../types/domain.js';
 import * as invoiceRepo from '../repositories/invoice.repository.js';
 import { getInvoiceQueue } from '../queues/index.js';
+import { generateAndStoreInvoicePdf, markInvoicePdfFailed } from './invoice-pdf.service.js';
 
 /**
  * Invoice service — thin layer over the invoice repository.
@@ -27,16 +28,25 @@ export async function createInvoice(params: {
   // Persist invoice + line items atomically in PostgreSQL
   const result = await invoiceRepo.createInvoice(params);
 
-  // Enqueue PDF generation (invoice worker will mark it 'ready')
+  // Generate PDF immediately. The PDF generator is pure Node and fast, and doing
+  // it here prevents invoices from getting stuck if Redis/workers are unavailable.
+  try {
+    await generateAndStoreInvoicePdf(result.invoiceId, params.userId);
+    return result;
+  } catch (err) {
+    console.error(`[InvoiceService] Inline PDF generation failed:`, err);
+  }
+
+  // Fallback: enqueue PDF generation retry if inline generation failed.
   try {
     await getInvoiceQueue().add('generate', {
       invoiceId: result.invoiceId,
       userId: params.userId,
     });
-    console.log(`[InvoiceService] PDF job enqueued for ${result.invoiceId}`);
+    console.log(`[InvoiceService] PDF retry job enqueued for ${result.invoiceId}`);
   } catch (err) {
-    // If queue fails, still return the invoice — PDF can be retried
-    console.error(`[InvoiceService] Failed to enqueue PDF job:`, err);
+    console.error(`[InvoiceService] Failed to enqueue PDF retry job:`, err);
+    await markInvoicePdfFailed(result.invoiceId, err).catch(() => {});
   }
 
   return result;

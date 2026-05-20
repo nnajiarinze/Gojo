@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { env } from '../config/env.js';
 import { query, queryOne } from '../config/database.js';
 import * as emailService from '../services/email.service.js';
+import { generateAndStoreInvoicePdf } from '../services/invoice-pdf.service.js';
 
 type AdminPaymentStatus = 'unpaid' | 'paid';
 
@@ -254,6 +255,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     );
 
     return reply.send(parseInvoiceRow(updated));
+  });
+
+  // ── Regenerate PDF for stuck/failed invoices ──────────────────────────
+  app.post('/invoices/:id/regenerate-pdf', { ...guardedRoute }, async (request, reply) => {
+    const { id } = request.params as any;
+
+    const row = await queryOne<any>('SELECT * FROM invoices WHERE id = $1', [id]);
+    if (!row) return reply.code(404).send({ error: 'Invoice not found' });
+
+    try {
+      const pdfUrl = await generateAndStoreInvoicePdf(id, row.user_id);
+      const updated = await queryOne<any>(
+        `SELECT i.*, o.name AS organization_name, o.slug AS organization_slug
+         FROM invoices i
+         LEFT JOIN organizations o ON o.id = i.organization_id
+         WHERE i.id = $1`,
+        [id]
+      );
+      return reply.send({ ...parseInvoiceRow(updated), pdfUrl });
+    } catch (err: any) {
+      return reply.code(500).send({ error: err.message ?? 'Failed to regenerate PDF' });
+    }
   });
 }
 
@@ -511,6 +534,7 @@ function renderDetail(inv) {
 
   // PDF
   html += '<div class="card"><h2>PDF</h2>';
+  html += '<button class="btn btn-sm btn-muted" style="margin-bottom:8px" onclick="regeneratePdf(&apos;' + inv.id + '&apos;)">Regenerate PDF</button><div id="pdf-regenerate-status" style="margin-bottom:8px;font-size:13px"></div>';
   if (inv.pdfUrl) {
     html += '<p style="margin-bottom:8px"><a href="' + inv.pdfUrl + '" target="_blank" style="color:#0066cc">' + inv.pdfUrl + '</a></p>';
     html += '<iframe src="' + inv.pdfUrl + '" style="width:100%;height:500px;border:1px solid #e0e0e0;border-radius:4px" title="PDF preview"></iframe>';
@@ -586,6 +610,18 @@ async function updatePaymentStatus(id, paymentStatus) {
     else loadList(listData.page || 1);
   } catch (e) {
     alert(e.message || 'Failed to update payment status');
+  }
+}
+
+async function regeneratePdf(id) {
+  const status = document.getElementById('pdf-regenerate-status');
+  if (status) status.textContent = 'Regenerating PDF...';
+  try {
+    await api('/invoices/' + id + '/regenerate-pdf', { method: 'POST' });
+    if (status) status.innerHTML = '<span style="color:#155724">✓ PDF regenerated</span>';
+    loadDetail(id);
+  } catch (e) {
+    if (status) status.innerHTML = '<span style="color:#dc3545">✗ ' + e.message + '</span>';
   }
 }
 
